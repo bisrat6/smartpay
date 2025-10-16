@@ -15,7 +15,7 @@ const calculatePayroll = async (companyId, startDate, endDate) => {
     // Get all employees for the company
     const employees = await Employee.find({ 
       companyId: companyId, 
-      status: 'active' 
+      isActive: true 
     });
 
     const payrollResults = [];
@@ -174,7 +174,7 @@ const getPayrollSummary = async (companyId, period) => {
 
     const employees = await Employee.find({ 
       companyId: companyId, 
-      status: 'active' 
+      isActive: true 
     });
 
     const summary = {
@@ -214,7 +214,7 @@ const getPendingPayments = async (companyId) => {
   try {
     const employees = await Employee.find({ 
       companyId: companyId, 
-      status: 'active' 
+      isActive: true 
     });
 
     const pendingPayments = await Payment.find({

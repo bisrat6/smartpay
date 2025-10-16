@@ -41,30 +41,54 @@ async function seed() {
 
     console.log('Creating employee users and records...');
     const employeesData = [
-      { email: 'employee1@example.com', name: 'Alice Worker', hourlyRate: 10 },
-      { email: 'employee2@example.com', name: 'Bob Helper', hourlyRate: 12 },
-      { email: 'employee3@example.com', name: 'Charlie Maker', hourlyRate: 9 }
+      { 
+        email: 'employee1@example.com', 
+        name: 'Alice Worker', 
+        hourlyRate: 10,
+        telebirrMsisdn: '251912345678'
+      },
+      { 
+        email: 'employee2@example.com', 
+        name: 'Bob Helper', 
+        hourlyRate: 12,
+        telebirrMsisdn: '251923456789'
+      },
+      { 
+        email: 'employee3@example.com', 
+        name: 'Charlie Maker', 
+        hourlyRate: 9,
+        telebirrMsisdn: '251934567890'
+      }
     ];
 
-    const employeeUsers = await Promise.all(
-      employeesData.map((e) =>
-        User.create({ email: e.email, password: 'Password123!', role: 'employee', companyId: company._id })
-      )
-    );
+    const employeeUsers = [];
+    const employees = [];
 
-    const employees = await Promise.all(
-      employeeUsers.map((user, idx) =>
-        Employee.create({
-          userId: user._id,
-          companyId: company._id,
-          name: employeesData[idx].name,
-          hourlyRate: employeesData[idx].hourlyRate,
-          department: 'Operations',
-          position: 'Associate',
-          employeeId: `EMP${idx + 1}`
-        })
-      )
-    );
+    // Create employee users and records
+    for (const empData of employeesData) {
+      // Create user with companyId (required for employee role)
+      const user = await User.create({
+        email: empData.email,
+        password: 'Password123!',
+        role: 'employee',
+        companyId: company._id
+      });
+      employeeUsers.push(user);
+
+      // Create employee record
+      const employee = await Employee.create({
+        userId: user._id,
+        companyId: company._id,
+        name: empData.name,
+        email: empData.email, // Required field in Employee model
+        hourlyRate: empData.hourlyRate,
+        department: 'Operations',
+        position: 'Associate',
+        telebirrMsisdn: empData.telebirrMsisdn, // Required for B2C payouts
+        isActive: true
+      });
+      employees.push(employee);
+    }
 
     console.log('Creating time logs for the past 5 days...');
     const now = new Date();
@@ -119,6 +143,13 @@ async function seed() {
     }
 
     console.log('Seed completed successfully.');
+    console.log('\n=== SEEDED DATA SUMMARY ===');
+    console.log(`Users: ${await User.countDocuments()}`);
+    console.log(`Companies: ${await Company.countDocuments()}`);
+    console.log(`Employees: ${await Employee.countDocuments()}`);
+    console.log(`Time Logs: ${await TimeLog.countDocuments()}`);
+    console.log(`Payments: ${await Payment.countDocuments()}`);
+    
     await mongoose.connection.close();
     process.exit(0);
   } catch (err) {

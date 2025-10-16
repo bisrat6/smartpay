@@ -11,7 +11,7 @@ const addEmployee = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, name, hourlyRate, department, position } = req.body;
+    const { email, name, hourlyRate, department, position, telebirrMsisdn, phoneNumber, address } = req.body;
 
     // Get company for current employer
     const company = await Company.findOne({ employerId: req.user._id });
@@ -44,10 +44,14 @@ const addEmployee = async (req, res) => {
       userId: user._id,
       companyId: company._id,
       name,
+      email,
       hourlyRate,
       department,
       position,
-      employeeId: `EMP${Date.now()}`,
+      telebirrMsisdn,
+      phoneNumber,
+      address,
+      isActive: true
     });
 
     await employee.save();
@@ -60,11 +64,14 @@ const addEmployee = async (req, res) => {
       employee: {
         id: employee._id,
         name: employee.name,
-        email: user.email,
+        email: employee.email,
         hourlyRate: employee.hourlyRate,
         department: employee.department,
         position: employee.position,
-        employeeId: employee.employeeId,
+        telebirrMsisdn: employee.telebirrMsisdn,
+        phoneNumber: employee.phoneNumber,
+        address: employee.address,
+        isActive: employee.isActive,
       },
     });
   } catch (error) {
@@ -119,7 +126,7 @@ const updateEmployee = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { name, hourlyRate, department, position, status } = req.body;
+    const { name, hourlyRate, department, position, isActive, telebirrMsisdn, phoneNumber, address, email } = req.body;
 
     const employee = await Employee.findById(req.params.id).populate(
       "companyId",
@@ -137,10 +144,14 @@ const updateEmployee = async (req, res) => {
 
     // Update fields
     if (name) employee.name = name;
+    if (email) employee.email = email;
     if (hourlyRate !== undefined) employee.hourlyRate = hourlyRate;
     if (department !== undefined) employee.department = department;
     if (position !== undefined) employee.position = position;
-    if (status) employee.status = status;
+    if (isActive !== undefined) employee.isActive = isActive;
+    if (telebirrMsisdn !== undefined) employee.telebirrMsisdn = telebirrMsisdn;
+    if (phoneNumber !== undefined) employee.phoneNumber = phoneNumber;
+    if (address !== undefined) employee.address = address;
 
     await employee.save();
 
@@ -173,7 +184,7 @@ const deleteEmployee = async (req, res) => {
 
     // Soft delete - deactivate user and employee
     await User.findByIdAndUpdate(employee.userId, { isActive: false });
-    await Employee.findByIdAndUpdate(employee._id, { status: "terminated" });
+    await Employee.findByIdAndUpdate(employee._id, { isActive: false });
 
     res.json({ message: "Employee deleted successfully" });
   } catch (error) {

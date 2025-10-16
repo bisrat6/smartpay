@@ -16,7 +16,7 @@ const signup = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password, role, companyName, employerName, arifpayMerchantKey } = req.body;
+    const { email, password, companyName, employerName, arifpayMerchantKey } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -24,25 +24,23 @@ const signup = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
 
-    // Create user
+    // Create employer user
     const user = new User({
       email,
       password,
-      role
+      role: 'employer'  // Only employers can self-register
     });
 
     await user.save();
 
-    // If employer, create company
-    if (role === 'employer') {
-      const company = new Company({
-        name: companyName,
-        employerName,
-        employerId: user._id,
-        arifpayMerchantKey
-      });
-      await company.save();
-    }
+    // Create company
+    const company = new Company({
+      name: companyName,
+      employerName,
+      employerId: user._id,
+      arifpayMerchantKey
+    });
+    await company.save();
 
     // Generate token
     const token = generateToken(user._id);

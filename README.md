@@ -1,6 +1,6 @@
 # SmartPay Backend
 
-An automated payroll system with time tracking and Arifpay payment integration.
+An automated payroll system with time tracking and Arifpay Telebirr B2C payment integration.
 
 ## Features
 
@@ -9,7 +9,7 @@ An automated payroll system with time tracking and Arifpay payment integration.
 - **Employee Management**: Employers can add, edit, and manage employees
 - **Time Tracking**: Clock-in/out system with automatic hour calculations
 - **Payroll Computation**: Automated salary calculation based on hours worked
-- **Arifpay Integration**: Digital payment processing with webhook support
+- **Arifpay B2C Integration**: Direct salary disbursement to employee Telebirr wallets
 - **Automated Scheduler**: Automated payroll processing based on payment cycles
 - **Security**: Rate limiting, input validation, and security headers
 
@@ -86,13 +86,13 @@ npm start
 - `GET /api/time-logs/company` - Get company time logs (employer only)
 - `PUT /api/time-logs/:id/approve` - Approve time log (employer only)
 
-### Payments
-- `POST /api/payments/process-payroll` - Process payroll and initiate payments
+### Payments (Arifpay B2C Payout)
+- `POST /api/payments/process-payroll` - Process payroll and initiate B2C payouts
 - `GET /api/payments` - Get payments (employer only)
 - `GET /api/payments/summary` - Get payroll summary
-- `POST /api/payments/initiate` - Initiate payment for specific employee
-- `POST /api/payments/retry-failed` - Retry failed payments
-- `POST /api/payments/webhook/arifpay` - Arifpay webhook endpoint
+- `POST /api/payments/initiate` - Initiate B2C payout for specific employee
+- `POST /api/payments/retry-failed` - Retry failed B2C payments
+- `POST /api/payments/webhook/arifpay` - Arifpay B2C webhook endpoint (no auth required)
 
 ## Database Models
 
@@ -103,7 +103,7 @@ npm start
 - name, employerName, employerId, paymentCycle, bonusRateMultiplier, maxDailyHours, arifpayMerchantKey
 
 ### Employee
-- userId, companyId, name, hourlyRate, status, employeeId, department, position
+- userId, companyId, name, hourlyRate, status, department, position, telebirrMsisdn (required for B2C payouts)
 
 ### TimeLog
 - employeeId, clockIn, clockOut, duration, regularHours, bonusHours, status, notes
@@ -132,12 +132,36 @@ The system includes automated schedulers for:
 
 ## Payment Integration
 
-The system integrates with Arifpay for digital payments:
+The system uses **Arifpay Telebirr B2C** for direct salary disbursement:
 
-- Automatic payment session creation
-- Webhook handling for payment status updates
-- Retry mechanism for failed payments
-- Bulk payment processing
+### 2-Step B2C Process
+1. **Create Session**: `POST https://api.arifpay.et/api/Telebirr/b2c/session` - Initialize B2C transaction and receive session_id
+2. **Execute Transfer**: `POST https://api.arifpay.et/api/Telebirr/b2c/transfer` - Finalize transfer using session_id and employee phone number
+
+### Features
+- Direct transfer to employee Telebirr wallets
+- Automated webhook handling for payment status updates
+- Retry mechanism for failed payments (max 3 retries)
+- Bulk payment processing for multiple employees
+- Secure webhook signature verification
+
+### Phone Number Format
+Employee Telebirr numbers must be in format: **251XXXXXXXXX** (e.g., 251912345678)
+
+### Transaction Status Codes
+- **SUCCESS**: Payment completed successfully
+- **PENDING**: Payment in progress
+- **FAILED**: Payment failed
+- **CANCELED/CANCELLED**: User cancelled
+- **EXPIRED**: Session timed out
+- **UNAUTHORIZED/FORBIDDEN**: Authorization error
+
+### Important Notes
+- All active employees **must have** `telebirrMsisdn` field populated
+- Phone numbers must include country code: `251XXXXXXXXX` or `+251XXXXXXXXX`
+- Webhook endpoint must return **HTTP 200** for Arifpay to mark it as processed
+- Ensure your Arifpay account has **Payouts/Disbursements** feature enabled
+- Test in sandbox mode first before production (set `ARIFPAY_BASE_URL` to sandbox endpoint)
 
 ## Environment Variables
 
@@ -146,9 +170,11 @@ The system integrates with Arifpay for digital payments:
 | PORT | Server port | No (default: 5000) |
 | MONGO_URI | MongoDB connection string | Yes |
 | JWT_SECRET | JWT signing secret | Yes |
-| ARIFPAY_MERCHANT_KEY | Arifpay merchant key | Yes |
+| ARIFPAY_MERCHANT_KEY | Arifpay merchant key for B2C payouts | Yes |
+| ARIFPAY_BASE_URL | Arifpay API base URL (or sandbox URL for testing) | No (default: https://api.arifpay.et) |
+| API_BASE_URL | Your backend API URL (for webhook callbacks) | Yes (for production) |
 | FRONTEND_URL | Frontend application URL | No |
-| ARIFPAY_WEBHOOK_URL | Webhook URL for Arifpay | No |
+| ARIFPAY_DRY_RUN | Set to "true" for testing without real API calls | No (default: false) |
 
 ## Contributing
 

@@ -11,15 +11,22 @@ const addEmployeeValidation = [
   body('name').notEmpty().withMessage('Employee name is required'),
   body('hourlyRate').isFloat({ min: 0 }).withMessage('Hourly rate must be a positive number'),
   body('department').optional().trim(),
-  body('position').optional().trim()
+  body('position').optional().trim(),
+  body('telebirrMsisdn').matches(/^251[0-9]{9}$/).withMessage('Telebirr number must be in format: 251XXXXXXXXX'),
+  body('phoneNumber').optional().trim(),
+  body('address').optional().trim()
 ];
 
 const updateEmployeeValidation = [
   body('name').optional().notEmpty().withMessage('Employee name cannot be empty'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('hourlyRate').optional().isFloat({ min: 0 }).withMessage('Hourly rate must be a positive number'),
   body('department').optional().trim(),
   body('position').optional().trim(),
-  body('status').optional().isIn(['active', 'inactive', 'terminated']).withMessage('Invalid status')
+  body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
+  body('telebirrMsisdn').optional().matches(/^251[0-9]{9}$/).withMessage('Telebirr number must be in format: 251XXXXXXXXX'),
+  body('phoneNumber').optional().trim(),
+  body('address').optional().trim()
 ];
 
 // Routes

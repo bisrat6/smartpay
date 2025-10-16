@@ -3,12 +3,13 @@ const Payment = require('../models/Payment');
 const Company = require('../models/Company');
 const arifpayService = require('../services/arifpayService');
 const payrollService = require('../services/payrollService');
-const chapaService = require('../services/chapaService');
-const arifpayPayout = require('../services/arifpayPayoutService');
 const Employee = require('../models/Employee');
 
+// ============================================
+// ARIFPAY B2C PAYOUT ENDPOINTS
+// ============================================
 
-// Initiate payment for an employee (Arifpay)
+// Initiate B2C payout for an employee (Main payment method)
 const initiatePayment = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -24,15 +25,15 @@ const initiatePayment = async (req, res) => {
       return res.status(404).json({ message: 'Company not found' });
     }
 
-    // Initialize payment with Arifpay
-    const result = await arifpayService.initializePayment(paymentId, company.arifpayMerchantKey);
+    // Initiate B2C payout via Telebirr
+    const result = await arifpayService.initiateTelebirrPayout(paymentId, company.arifpayMerchantKey);
 
     res.json({
-      message: 'Payment initiated successfully',
+      message: 'B2C payout initiated successfully',
       ...result
     });
   } catch (error) {
-    console.error('Initiate payment error:', error);
+    console.error('Initiate B2C payout error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -100,7 +101,7 @@ const getPayment = async (req, res) => {
   }
 };
 
-// Process payroll and initiate payments (Arifpay)
+// Process payroll and initiate B2C payments
 const processPayroll = async (req, res) => {
   try {
     // Get company
@@ -115,11 +116,11 @@ const processPayroll = async (req, res) => {
     // Get pending payments
     const pendingPayments = await payrollService.getPendingPayments(company._id);
 
-    // Initiate payments with Arifpay
+    // Initiate B2C payouts for all pending payments
     const paymentResults = [];
     for (const payment of pendingPayments) {
       try {
-        const result = await arifpayService.initializePayment(
+        const result = await arifpayService.initiateTelebirrPayout(
           payment._id, 
           company.arifpayMerchantKey
         );
@@ -128,22 +129,32 @@ const processPayroll = async (req, res) => {
           employeeName: payment.employeeId.name,
           amount: payment.amount,
           sessionId: result.sessionId,
-          paymentUrl: result.paymentUrl
+          phoneNumber: result.phoneNumber,
+          success: true
         });
       } catch (error) {
         paymentResults.push({
           paymentId: payment._id,
           employeeName: payment.employeeId.name,
           amount: payment.amount,
+          success: false,
           error: error.message
         });
       }
     }
 
+    const successful = paymentResults.filter(p => p.success).length;
+    const failed = paymentResults.filter(p => !p.success).length;
+
     res.json({
       message: 'Payroll processed successfully',
       payroll: payrollResult,
-      payments: paymentResults
+      payments: {
+        total: paymentResults.length,
+        successful,
+        failed,
+        details: paymentResults
+      }
     });
   } catch (error) {
     console.error('Process payroll error:', error);
@@ -176,7 +187,7 @@ const getPayrollSummary = async (req, res) => {
   }
 };
 
-// Handle Arifpay webhook
+// Handle Arifpay B2C webhook
 const handleWebhook = async (req, res) => {
   try {
     const signature = req.headers['x-arifpay-signature'];
@@ -184,6 +195,7 @@ const handleWebhook = async (req, res) => {
 
     const merchantKey = process.env.ARIFPAY_MERCHANT_KEY;
 
+    // Verify webhook signature for security
     const isValidSignature = arifpayService.verifyWebhookSignature(
       payload, 
       signature, 
@@ -191,19 +203,22 @@ const handleWebhook = async (req, res) => {
     );
 
     if (!isValidSignature) {
+      console.warn('[B2C Webhook] Invalid signature received');
       return res.status(400).json({ message: 'Invalid webhook signature' });
     }
 
-    const result = await arifpayService.handleWebhook(req.body);
+    // Process B2C webhook
+    const result = await arifpayService.handleB2CWebhook(req.body);
 
     if (result.success) {
-      res.status(200).json({ message: 'Webhook processed successfully' });
+      // Webhook MUST return HTTP 200 for Arifpay to mark it as processed
+      return res.status(200).json({ message: 'Webhook processed successfully' });
     } else {
-      res.status(400).json({ message: result.message });
+      return res.status(400).json({ message: result.message });
     }
   } catch (error) {
-    console.error('Webhook handling error:', error);
-    res.status(500).json({ message: 'Webhook processing failed' });
+    console.error('[B2C Webhook] Processing error:', error);
+    return res.status(500).json({ message: 'Webhook processing failed' });
   }
 };
 
@@ -230,143 +245,24 @@ const retryFailedPayments = async (req, res) => {
   }
 };
 
-// Chapa: Initiate payment
-const initiatePaymentChapa = async (req, res) => {
-  try {
-    const { paymentId } = req.body;
-
-    const payment = await Payment.findById(paymentId).populate('employeeId');
-    if (!payment || payment.status !== 'pending') {
-      return res.status(400).json({ message: 'Invalid or non-pending payment' });
-    }
-
-    const employeeName = payment.employeeId?.name || 'Employee';
-    const txRef = `PAY_${payment._id}_${Date.now()}`;
-    const callbackUrl = `${process.env.API_BASE_URL}/api/payments/webhook/chapa`;
-    const returnUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/payment/success`;
-
-    const result = await chapaService.initializePayment({
-      amount: Number(payment.amount).toFixed(2),
-      currency: 'ETB',
-      email: 'payer@example.com',
-      firstName: employeeName.split(' ')[0] || 'Employee',
-      lastName: employeeName.split(' ')[1] || 'User',
-      txRef,
-      callbackUrl,
-      returnUrl
-    });
-
-    payment.arifpaySessionId = txRef; // store reference
-    payment.status = 'processing';
-    await payment.save();
-
-    res.json({
-      message: 'Chapa payment initiated',
-      txRef,
-      paymentUrl: result.checkoutUrl
-    });
-  } catch (err) {
-    console.error('Chapa initiate error:', err);
-    res.status(500).json({ message: err.message || 'Chapa initiation failed' });
-  }
-};
-
-// Chapa: Webhook/verification handler
-const handleChapaWebhook = async (req, res) => {
-  try {
-    const txRef = req.body?.tx_ref || req.query?.tx_ref;
-    if (!txRef) return res.status(400).json({ message: 'tx_ref missing' });
-
-    const verify = await chapaService.verifyPayment(txRef);
-    if (!verify.success) {
-      return res.status(400).json({ message: 'Payment not successful', data: verify.data });
-    }
-
-    const payment = await Payment.findOne({ arifpaySessionId: txRef });
-    if (!payment) return res.status(404).json({ message: 'Payment not found' });
-
-    payment.status = 'completed';
-    payment.arifpayTransactionId = verify.data?.tx_ref || txRef;
-    payment.paymentDate = new Date();
-    await payment.save();
-
-    res.json({ message: 'Payment verified and completed', paymentId: payment._id });
-  } catch (err) {
-    console.error('Chapa webhook error:', err);
-    res.status(500).json({ message: 'Chapa webhook processing failed' });
-  }
-};
-
-// Arifpay Telebirr B2C: initiate payout
-const payWithArifpayTelebirr = async (req, res) => {
-  try {
-    const { paymentId } = req.body;
-    const payment = await Payment.findById(paymentId).populate('employeeId');
-    if (!payment) return res.status(404).json({ message: 'Payment not found' });
-
-    const emp = payment.employeeId;
-    if (!emp?.telebirrMsisdn) return res.status(400).json({ message: 'Employee Telebirr wallet not set' });
-
-    const callbackUrl = `${process.env.API_BASE_URL}/api/payments/webhook/arifpay-payout`;
-
-    const result = await arifpayPayout.telebirrB2C({
-      phoneNumber: emp.telebirrMsisdn,
-      amount: payment.amount,
-      reason: `Salary ${payment.period?.startDate ? new Date(payment.period.startDate).toDateString() : ''}`,
-      reference: payment._id.toString(),
-      callbackUrl
-    });
-
-    payment.status = 'processing';
-    await payment.save();
-
-    res.json({ message: 'Arifpay payout initiated', result });
-  } catch (err) {
-    console.error('Arifpay payout error:', err);
-    res.status(500).json({ message: 'Payout initiation failed' });
-  }
-};
-
-// Arifpay payout: webhook callback
-const handleArifpayPayoutWebhook = async (req, res) => {
-  try {
-    const raw = req.rawBody || JSON.stringify(req.body);
-    const sig = req.headers['x-arifpay-signature'] || '';
-    if (!arifpayPayout.verifySignature(raw, sig)) {
-      return res.status(400).json({ message: 'Invalid signature' });
-    }
-
-    const data = req.body; // expect { reference, status, transactionId, reason? }
-    const payment = await Payment.findById(data.reference);
-    if (!payment) return res.status(404).json({ message: 'Payment not found' });
-
-    if (['completed', 'success', 'SUCCESS'].includes(String(data.status).toLowerCase())) {
-      payment.status = 'completed';
-      payment.arifpayTransactionId = data.transactionId || payment.arifpayTransactionId;
-      payment.paymentDate = new Date();
-    } else {
-      payment.status = 'failed';
-      payment.failureReason = data.reason || 'Arifpay payout failed';
-    }
-    await payment.save();
-    res.json({ ok: true });
-  } catch (err) {
-    console.error('Arifpay payout webhook error:', err);
-    res.status(500).json({ message: 'Webhook processing failed' });
-  }
-};
+// ============================================
+// MODULE EXPORTS
+// ============================================
 
 module.exports = {
-  initiatePayment,
+  // Payment operations
+  initiatePayment,           // Main B2C payout initiation
   getPayments,
   getPayment,
+  
+  // Payroll processing
   processPayroll,
   getPayrollSummary,
-  handleWebhook,
-  retryFailedPayments,
-  initiatePaymentChapa,
-  handleChapaWebhook,
-  payWithArifpayTelebirr,
-  handleArifpayPayoutWebhook
+  
+  // Webhooks
+  handleWebhook,             // B2C webhook handler
+  
+  // Retry operations
+  retryFailedPayments
 };
 

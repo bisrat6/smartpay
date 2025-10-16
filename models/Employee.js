@@ -54,7 +54,19 @@ const employeeSchema = new mongoose.Schema({
   },
   telebirrMsisdn: {
     type: String,
-    trim: true
+    trim: true,
+    required: function() {
+      // Required for active employees to receive B2C payouts
+      return this.isActive === true;
+    },
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Will be caught by required if isActive
+        // Ethiopian Telebirr format: 251XXXXXXXXX (as per Arifpay docs)
+        return /^251[0-9]{9}$/.test(v);
+      },
+      message: 'Telebirr phone number must be in format: 251XXXXXXXXX (e.g., 251912345678)'
+    }
   }
 }, {
   timestamps: true

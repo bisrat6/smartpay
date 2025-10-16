@@ -5,14 +5,14 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Validation middleware
+// Validation middleware - Only employers can self-register
 const signupValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').isIn(['employer', 'employee']).withMessage('Role must be employer or employee'),
-  body('companyName').if(body('role').equals('employer')).notEmpty().withMessage('Company name is required for employers'),
-  body('employerName').if(body('role').equals('employer')).notEmpty().withMessage('Employer name is required for employers'),
-  body('arifpayMerchantKey').if(body('role').equals('employer')).notEmpty().withMessage('Arifpay merchant key is required for employers')
+  body('role').equals('employer').withMessage('Only employers can self-register. Employees are created by employers.'),
+  body('companyName').notEmpty().withMessage('Company name is required'),
+  body('employerName').notEmpty().withMessage('Employer name is required'),
+  body('arifpayMerchantKey').notEmpty().withMessage('Arifpay merchant key is required')
 ];
 
 const loginValidation = [

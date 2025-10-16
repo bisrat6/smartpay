@@ -60,7 +60,7 @@ const processPayrollForCycle = async (cycle) => {
         if (pendingPayments.length > 0) {
           console.log(`Processing ${pendingPayments.length} pending payments for company: ${company.name}`);
 
-          // Process payments with Arifpay
+          // Process payments with Arifpay B2C Payout
           const paymentResults = await arifpayService.processBulkPayments(
             pendingPayments.map(p => p._id.toString()),
             company.arifpayMerchantKey

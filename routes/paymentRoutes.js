@@ -8,11 +8,7 @@ const {
   processPayroll,
   getPayrollSummary,
   handleWebhook,
-  retryFailedPayments,
-  initiatePaymentChapa,
-  handleChapaWebhook,
-  payWithArifpayTelebirr,
-  handleArifpayPayoutWebhook
+  retryFailedPayments
 } = require('../controllers/paymentController');
 
 const { authMiddleware, employerOnly } = require('../middleware/authMiddleware');
@@ -24,21 +20,35 @@ const initiatePaymentValidation = [
   body('paymentId').isMongoId().withMessage('Valid payment ID is required')
 ];
 
-// Employer routes
-router.post('/initiate', authMiddleware, employerOnly, initiatePaymentValidation, initiatePayment);
-router.post('/chapa/initiate', authMiddleware, employerOnly, initiatePaymentValidation, initiatePaymentChapa);
-router.get('/', authMiddleware, employerOnly, getPayments);
-router.get('/summary', authMiddleware, employerOnly, getPayrollSummary);
-router.get('/:id', authMiddleware, employerOnly, getPayment);
-router.post('/process-payroll', authMiddleware, employerOnly, processPayroll);
-router.post('/retry-failed', authMiddleware, employerOnly, retryFailedPayments);
-// Arifpay Telebirr B2C payout
-router.post('/arifpay/payout/telebirr', authMiddleware, employerOnly, initiatePaymentValidation, payWithArifpayTelebirr);
+// ============================================
+// EMPLOYER ROUTES (Authentication Required)
+// ============================================
 
-// Webhook routes (no auth required)
+// Initiate B2C payout for a specific payment
+router.post('/initiate', authMiddleware, employerOnly, initiatePaymentValidation, initiatePayment);
+
+// Get all payments for company
+router.get('/', authMiddleware, employerOnly, getPayments);
+
+// Get single payment details
+router.get('/:id', authMiddleware, employerOnly, getPayment);
+
+// Get payroll summary
+router.get('/summary', authMiddleware, employerOnly, getPayrollSummary);
+
+// Process payroll (calculate and initiate all pending payments)
+router.post('/process-payroll', authMiddleware, employerOnly, processPayroll);
+
+// Retry failed payments
+router.post('/retry-failed', authMiddleware, employerOnly, retryFailedPayments);
+
+// ============================================
+// WEBHOOK ROUTES (No Authentication)
+// ============================================
+
+// Arifpay B2C webhook - receives payment status updates
+// IMPORTANT: Must return HTTP 200 for Arifpay to mark webhook as processed
 router.post('/webhook/arifpay', handleWebhook);
-router.post('/webhook/chapa', handleChapaWebhook);
-router.post('/webhook/arifpay-payout', handleArifpayPayoutWebhook);
 
 module.exports = router;
 
