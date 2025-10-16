@@ -1,0 +1,37 @@
+{
+  "name": "smartpay-backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node scripts/seed.js",
+    "seed:clear": "node scripts/clear.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "payroll",
+    "time-tracking",
+    "arifpay",
+    "automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "description": "SmartPay Backend - Automated payroll system with time tracking and Arifpay integration",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.1.0",
+    "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.1",
+    "node-cron": "^4.2.1"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.2.3"
+  }
+}
