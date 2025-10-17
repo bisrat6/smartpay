@@ -2,21 +2,21 @@ const express = require('express');
 const { body } = require('express-validator');
 
 const {
-  initiatePayment,
   getPayments,
   getPayment,
   processPayroll,
   getPayrollSummary,
   handleWebhook,
-  retryFailedPayments
+  retryFailedPayments,
+  approvePayment,
+  approvePaymentsForPeriod
 } = require('../controllers/paymentController');
 
 const { authMiddleware, employerOnly } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Validation middleware
-const initiatePaymentValidation = [
+const approvePaymentValidation = [
   body('paymentId').isMongoId().withMessage('Valid payment ID is required')
 ];
 
@@ -24,8 +24,11 @@ const initiatePaymentValidation = [
 // EMPLOYER ROUTES (Authentication Required)
 // ============================================
 
-// Initiate B2C payout for a specific payment
-router.post('/initiate', authMiddleware, employerOnly, initiatePaymentValidation, initiatePayment);
+// Approve a single payment then process it
+router.post('/approve', authMiddleware, employerOnly, approvePaymentValidation, approvePayment);
+
+// Approve all pending payments for a period and process them
+router.post('/approve/bulk', authMiddleware, employerOnly, approvePaymentsForPeriod);
 
 // Get all payments for company
 router.get('/', authMiddleware, employerOnly, getPayments);

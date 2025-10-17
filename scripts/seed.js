@@ -143,6 +143,16 @@ async function seed() {
       }
     }
 
+    // Ensure indexes are in sync for new schema changes
+    console.log('Syncing indexes...');
+    await Promise.all([
+      User.syncIndexes?.(),
+      Company.syncIndexes?.(),
+      Employee.syncIndexes?.(),
+      TimeLog.syncIndexes?.(),
+      Payment.syncIndexes?.()
+    ]);
+
     console.log('Seed completed successfully.');
     console.log('\n=== SEEDED DATA SUMMARY ===');
     console.log(`Users: ${await User.countDocuments()}`);

@@ -8,7 +8,7 @@ const schedulePayrollProcessing = () => {
   console.log('Setting up payroll processing scheduler...');
 
   // Daily payroll processing - runs every midnight
-  cron.schedule('0 0 * * *', async () => {
+  cron.schedule('* * * * *', async () => {
     console.log('Running daily payroll processing...');
     await processPayrollForCycle('daily');
   }, {
@@ -54,15 +54,15 @@ const processPayrollForCycle = async (cycle) => {
         
         console.log(`Payroll calculated for ${payrollResult.employeesWithPayments} employees, total amount: ${payrollResult.totalAmount}`);
 
-        // Get pending payments
-        const pendingPayments = await payrollService.getPendingPayments(company._id);
+        // Get approved payments
+        const approvedPayments = await payrollService.getApprovedPayments(company._id);
         
-        if (pendingPayments.length > 0) {
-          console.log(`Processing ${pendingPayments.length} pending payments for company: ${company.name}`);
+        if (approvedPayments.length > 0) {
+          console.log(`Processing ${approvedPayments.length} approved payments for company: ${company.name}`);
 
           // Process payments with Arifpay B2C Payout
           const paymentResults = await arifpayService.processBulkPayments(
-            pendingPayments.map(p => p._id.toString()),
+            approvedPayments.map(p => p._id.toString()),
             company.arifpayMerchantKey
           );
 
@@ -78,7 +78,7 @@ const processPayrollForCycle = async (cycle) => {
             console.log('Failed payments:', failed.map(f => ({ paymentId: f.paymentId, error: f.error })));
           }
         } else {
-          console.log(`No pending payments found for company: ${company.name}`);
+          console.log(`No approved payments found for company: ${company.name}`);
         }
 
       } catch (error) {

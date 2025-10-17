@@ -18,6 +18,7 @@ const calculatePayroll = async (companyId, startDate, endDate) => {
       isActive: true 
     });
 
+
     const payrollResults = [];
 
     for (const employee of employees) {
@@ -25,9 +26,10 @@ const calculatePayroll = async (companyId, startDate, endDate) => {
       const timeLogs = await TimeLog.find({
         employeeId: employee._id,
         status: 'approved',
-        clockIn: { $gte: startDate, $lte: endDate },
+        //clockIn: { $gte: startDate, $lte: endDate },
         clockOut: { $exists: true }
       });
+      console.log(timeLogs);
 
       // Calculate totals
       const totalRegularHours = timeLogs.reduce((sum, log) => sum + log.regularHours, 0);
@@ -57,13 +59,14 @@ const calculatePayroll = async (companyId, startDate, endDate) => {
             },
             regularHours: totalRegularHours,
             bonusHours: totalBonusHours,
-            hourlyRate: employee.hourlyRate,
-            bonusRateMultiplier: company.bonusRateMultiplier,
+            hourlyRate: employee.hourlyRate ?? 0,
+            bonusRateMultiplier: (company.bonusRateMultiplier ?? 1),
             timeLogIds: timeLogs.map(log => log._id),
             status: 'pending'
           });
 
           await payment.save();
+          console.log(`[Payroll] Created pending payment ${payment._id} for employee ${employee._id} amount=${payment.amount}`);
 
           payrollResults.push({
             employeeId: employee._id,
@@ -231,9 +234,32 @@ const getPendingPayments = async (companyId) => {
   }
 };
 
+// Get approved payments for processing
+const getApprovedPayments = async (companyId) => {
+  try {
+    const employees = await Employee.find({ 
+      companyId: companyId, 
+      isActive: true 
+    });
+
+    const approvedPayments = await Payment.find({
+      employeeId: { $in: employees.map(emp => emp._id) },
+      status: 'approved'
+    })
+    .populate('employeeId', 'name hourlyRate')
+    .sort({ createdAt: 1 });
+
+    return approvedPayments;
+  } catch (error) {
+    console.error('Get approved payments error:', error);
+    throw error;
+  }
+};
+
 module.exports = {
   calculatePayroll,
   processPayroll,
   getPayrollSummary,
-  getPendingPayments
+  getPendingPayments,
+  getApprovedPayments
 };

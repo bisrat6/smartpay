@@ -130,8 +130,8 @@ const initiateTelebirrPayout = async (paymentId, merchantKey) => {
       throw new Error("Payment not found");
     }
 
-    if (payment.status !== "pending") {
-      throw new Error(`Payment is not in pending status (current: ${payment.status})`);
+    if (payment.status !== "approved") {
+      throw new Error(`Payment is not in approved status (current: ${payment.status})`);
     }
 
     const employee = payment.employeeId;

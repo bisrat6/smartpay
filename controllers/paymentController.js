@@ -9,34 +9,7 @@ const Employee = require('../models/Employee');
 // ARIFPAY B2C PAYOUT ENDPOINTS
 // ============================================
 
-// Initiate B2C payout for an employee (Main payment method)
-const initiatePayment = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { paymentId } = req.body;
-
-    // Get company for current user
-    const company = await Company.findOne({ employerId: req.user._id });
-    if (!company) {
-      return res.status(404).json({ message: 'Company not found' });
-    }
-
-    // Initiate B2C payout via Telebirr
-    const result = await arifpayService.initiateTelebirrPayout(paymentId, company.arifpayMerchantKey);
-
-    res.json({
-      message: 'B2C payout initiated successfully',
-      ...result
-    });
-  } catch (error) {
-    console.error('Initiate B2C payout error:', error);
-    res.status(500).json({ message: error.message });
-  }
-};
+// (Removed) Initiate payment route - superseded by approval flow
 
 // Get payments for company
 const getPayments = async (req, res) => {
@@ -101,7 +74,7 @@ const getPayment = async (req, res) => {
   }
 };
 
-// Process payroll and initiate B2C payments
+// Process payroll (calculate only; do not auto-initiate)
 const processPayroll = async (req, res) => {
   try {
     // Get company
@@ -113,51 +86,120 @@ const processPayroll = async (req, res) => {
     // Process payroll for the company
     const payrollResult = await payrollService.processPayroll(company._id);
 
-    // Get pending payments
+    // Get pending payments count for visibility
     const pendingPayments = await payrollService.getPendingPayments(company._id);
 
-    // Initiate B2C payouts for all pending payments
-    const paymentResults = [];
-    for (const payment of pendingPayments) {
-      try {
-        const result = await arifpayService.initiateTelebirrPayout(
-          payment._id, 
-          company.arifpayMerchantKey
-        );
-        paymentResults.push({
-          paymentId: payment._id,
-          employeeName: payment.employeeId.name,
-          amount: payment.amount,
-          sessionId: result.sessionId,
-          phoneNumber: result.phoneNumber,
-          success: true
-        });
-      } catch (error) {
-        paymentResults.push({
-          paymentId: payment._id,
-          employeeName: payment.employeeId.name,
-          amount: payment.amount,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    const successful = paymentResults.filter(p => p.success).length;
-    const failed = paymentResults.filter(p => !p.success).length;
-
     res.json({
-      message: 'Payroll processed successfully',
+      message: 'Payroll calculated successfully',
       payroll: payrollResult,
       payments: {
-        total: paymentResults.length,
-        successful,
-        failed,
-        details: paymentResults
+        pending: pendingPayments.length
       }
     });
   } catch (error) {
     console.error('Process payroll error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Approve a single pending payment and immediately process it
+const approvePayment = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { paymentId } = req.body;
+
+    const company = await Company.findOne({ employerId: req.user._id });
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const payment = await Payment.findById(paymentId).populate('employeeId', 'companyId name');
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    if (payment.status !== 'pending') {
+      return res.status(400).json({ message: `Payment not approvable (status: ${payment.status})` });
+    }
+
+    if (payment.employeeId.companyId.toString() !== company._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to approve this payment' });
+    }
+
+    payment.status = 'approved';
+    payment.approvedAt = new Date();
+    payment.approvedBy = req.user._id;
+    await payment.save();
+
+    const result = await arifpayService.initiateTelebirrPayout(payment._id, company.arifpayMerchantKey);
+
+    return res.json({
+      message: 'Payment approved and sent',
+      paymentId: payment._id,
+      ...result
+    });
+  } catch (error) {
+    console.error('Approve payment error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Approve all pending payments in a period and process them in bulk
+const approvePaymentsForPeriod = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.body || {};
+
+    const company = await Company.findOne({ employerId: req.user._id });
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    const employees = await Employee.find({ companyId: company._id, isActive: true });
+    const employeeIds = employees.map(e => e._id);
+
+    let query = {
+      employeeId: { $in: employeeIds },
+      status: 'pending'
+    };
+
+    if (startDate && endDate) {
+      query['period.startDate'] = new Date(startDate);
+      query['period.endDate'] = new Date(endDate);
+    }
+
+    const pendingToApprove = await Payment.find(query);
+
+    if (pendingToApprove.length === 0) {
+      return res.json({ message: 'No pending payments to approve', approved: 0, processed: 0 });
+    }
+
+    const ids = [];
+    for (const p of pendingToApprove) {
+      p.status = 'approved';
+      p.approvedAt = new Date();
+      p.approvedBy = req.user._id;
+      await p.save();
+      ids.push(p._id.toString());
+    }
+
+    const results = await arifpayService.processBulkPayments(ids, company.arifpayMerchantKey);
+    const successful = results.filter(r => r.success).length;
+    const failed = results.length - successful;
+
+    return res.json({
+      message: 'Approved and processed payments',
+      approved: ids.length,
+      processed: results.length,
+      successful,
+      failed,
+      results
+    });
+  } catch (error) {
+    console.error('Approve payments for period error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -251,9 +293,10 @@ const retryFailedPayments = async (req, res) => {
 
 module.exports = {
   // Payment operations
-  initiatePayment,           // Main B2C payout initiation
   getPayments,
   getPayment,
+  approvePayment,
+  approvePaymentsForPeriod,
   
   // Payroll processing
   processPayroll,

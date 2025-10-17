@@ -23,7 +23,7 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'],
+    enum: ['pending', 'approved', 'processing', 'completed', 'failed', 'cancelled'],
     default: 'pending'
   },
   arifpayTransactionId: {
@@ -71,6 +71,13 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     default: 0,
     max: 3
+  },
+  approvedAt: {
+    type: Date
+  },
+  approvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   }
 }, {
   timestamps: true
