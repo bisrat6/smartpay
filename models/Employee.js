@@ -9,7 +9,6 @@ const employeeSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
     lowercase: true,
     trim: true
   },
@@ -72,9 +71,15 @@ const employeeSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for efficient queries
+// Indexes for efficient queries and uniqueness constraints per company
 employeeSchema.index({ companyId: 1 });
 employeeSchema.index({ userId: 1 });
 employeeSchema.index({ email: 1 });
+
+// Ensure an employee (by user) is unique within a company, but can exist across companies
+employeeSchema.index({ userId: 1, companyId: 1 }, { unique: true });
+
+// Ensure the same email can be used in different companies, but only once per company
+employeeSchema.index({ email: 1, companyId: 1 }, { unique: true });
 
 module.exports = mongoose.model('Employee', employeeSchema);

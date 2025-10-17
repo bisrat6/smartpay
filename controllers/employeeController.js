@@ -2,6 +2,7 @@ const { validationResult } = require("express-validator");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
 const Company = require("../models/Company");
+const { sendEmployeeWelcomePassword } = require("../services/emailService");
 
 // Add new employee
 const addEmployee = async (req, res) => {
@@ -19,25 +20,28 @@ const addEmployee = async (req, res) => {
       return res.status(404).json({ message: "Company not found" });
     }
 
-    // Check if user already exists
+    // Find or create the user for this email
     let user = await User.findOne({ email });
-    if (user) {
-      return res
-        .status(400)
-        .json({ message: "User already exists with this email" });
+    let tempPassword;
+    let isNewUser = false;
+    if (!user) {
+      // Create user account for employee with a randomly generated password
+      tempPassword = Math.random().toString(36).slice(-10);
+      console.log("Temporary password for new employee:", tempPassword);
+      user = new User({
+        email,
+        password: tempPassword, // pre-save hook hashes once
+        role: "employee",
+      });
+      await user.save();
+      isNewUser = true;
     }
 
-    // Create user account for employee with temp password and force change on first login
-    const tempPassword = Math.random().toString(36).slice(-10);
-    user = new User({
-      email,
-      password: tempPassword, // pre-save hook hashes once
-      role: "employee",
-      companyId: company._id,
-      mustChangePassword: true,
-    });
-
-    await user.save();
+    // Prevent duplicates within the same company (by email or userId)
+    const existingInCompany = await Employee.findOne({ $or: [ { email }, { userId: user._id } ], companyId: company._id });
+    if (existingInCompany) {
+      return res.status(400).json({ message: "Employee already exists in this company" });
+    }
 
     // Create employee record
     const employee = new Employee({
@@ -56,9 +60,16 @@ const addEmployee = async (req, res) => {
 
     await employee.save();
 
-    // Note: tempPassword should NOT be returned in production responses. It is generated
-    // here for demo and should be sent to the employee through a secure channel (email/SMS)
-    // or a secure onboarding flow. We intentionally do not include it in the API response.
+    // Only send password email if this is a brand-new user
+    if (isNewUser && tempPassword) {
+      try {
+        await sendEmployeeWelcomePassword({ to: email, name, password: tempPassword });
+      } catch (mailErr) {
+        console.error("Failed to send welcome password email:", mailErr.message);
+      }
+    }
+
+    // Note: the generated password is emailed to the employee; it is not returned in the API response.
     res.status(201).json({
       message: "Employee added successfully",
       employee: {
@@ -183,7 +194,6 @@ const deleteEmployee = async (req, res) => {
     }
 
     // Soft delete - deactivate user and employee
-    await User.findByIdAndUpdate(employee.userId, { isActive: false });
     await Employee.findByIdAndUpdate(employee._id, { isActive: false });
 
     res.json({ message: "Employee deleted successfully" });

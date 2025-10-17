@@ -30,11 +30,11 @@ router.post('/initiate', authMiddleware, employerOnly, initiatePaymentValidation
 // Get all payments for company
 router.get('/', authMiddleware, employerOnly, getPayments);
 
+// Get payroll summary (define BEFORE :id to avoid param capture)
+router.get('/summary', authMiddleware, employerOnly, getPayrollSummary);
+
 // Get single payment details
 router.get('/:id', authMiddleware, employerOnly, getPayment);
-
-// Get payroll summary
-router.get('/summary', authMiddleware, employerOnly, getPayrollSummary);
 
 // Process payroll (calculate and initiate all pending payments)
 router.post('/process-payroll', authMiddleware, employerOnly, processPayroll);

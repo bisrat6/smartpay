@@ -102,6 +102,7 @@ async function seed() {
 
         logsToInsert.push({
           employeeId: emp._id,
+          companyId: company._id,
           clockIn,
           clockOut,
           status: 'approved'

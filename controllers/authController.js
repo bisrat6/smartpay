@@ -97,8 +97,7 @@ const login = async (req, res) => {
         id: user._id,
         email: user.email,
         role: user.role,
-        companyId: user.companyId,
-        mustChangePassword: user.mustChangePassword
+        companyId: user.companyId
       }
     });
   } catch (error) {
@@ -107,7 +106,7 @@ const login = async (req, res) => {
   }
 };
 
-// Change password (supports first-login change when mustChangePassword is true)
+// Change password
 const changePassword = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -120,13 +119,10 @@ const changePassword = async (req, res) => {
 
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    if (!user.mustChangePassword) {
-      const ok = await user.comparePassword(currentPassword || '');
-      if (!ok) return res.status(400).json({ message: 'Current password incorrect' });
-    }
+    const ok = await user.comparePassword(currentPassword || '');
+    if (!ok) return res.status(400).json({ message: 'Current password incorrect' });
 
     user.password = newPassword;
-    user.mustChangePassword = false;
     user.passwordChangedAt = new Date();
     await user.save();
 

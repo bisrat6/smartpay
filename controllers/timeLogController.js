@@ -6,7 +6,18 @@ const Company = require('../models/Company');
 // Clock in
 const clockIn = async (req, res) => {
   try {
-    const employee = await Employee.findOne({ userId: req.user._id });
+    const { companyId: companyIdParam } = req.body;
+    // If the user has multiple companies, require explicit companyId
+    let employee;
+    if (companyIdParam) {
+      employee = await Employee.findOne({ userId: req.user._id, companyId: companyIdParam });
+    } else {
+      const employees = await Employee.find({ userId: req.user._id });
+      if (employees.length > 1) {
+        return res.status(400).json({ message: 'Multiple employments found. Please specify companyId.' });
+      }
+      employee = employees[0];
+    }
     
     if (!employee) {
       return res.status(404).json({ message: 'Employee record not found' });
@@ -31,6 +42,7 @@ const clockIn = async (req, res) => {
     // Create new time log
     const timeLog = new TimeLog({
       employeeId: employee._id,
+      companyId: employee.companyId,
       clockIn: new Date()
     });
 
@@ -53,7 +65,17 @@ const clockIn = async (req, res) => {
 // Clock out
 const clockOut = async (req, res) => {
   try {
-    const employee = await Employee.findOne({ userId: req.user._id });
+    const { companyId: companyIdParam } = req.body;
+    let employee;
+    if (companyIdParam) {
+      employee = await Employee.findOne({ userId: req.user._id, companyId: companyIdParam });
+    } else {
+      const employees = await Employee.find({ userId: req.user._id });
+      if (employees.length > 1) {
+        return res.status(400).json({ message: 'Multiple employments found. Please specify companyId.' });
+      }
+      employee = employees[0];
+    }
     
     if (!employee) {
       return res.status(404).json({ message: 'Employee record not found' });
@@ -101,8 +123,17 @@ const clockOut = async (req, res) => {
 // Get time logs for employee
 const getTimeLogs = async (req, res) => {
   try {
-    const { page = 1, limit = 10, status } = req.query;
-    const employee = await Employee.findOne({ userId: req.user._id });
+    const { page = 1, limit = 10, status, companyId } = req.query;
+    let employee;
+    if (companyId) {
+      employee = await Employee.findOne({ userId: req.user._id, companyId });
+    } else {
+      const employees = await Employee.find({ userId: req.user._id });
+      if (employees.length > 1) {
+        return res.status(400).json({ message: 'Multiple employments found. Please specify companyId.' });
+      }
+      employee = employees[0];
+    }
     
     if (!employee) {
       return res.status(404).json({ message: 'Employee record not found' });

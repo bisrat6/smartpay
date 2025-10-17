@@ -6,6 +6,11 @@ const timeLogSchema = new mongoose.Schema({
     ref: 'Employee',
     required: true
   },
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true
+  },
   clockIn: {
     type: Date,
     required: true
@@ -65,6 +70,7 @@ timeLogSchema.pre('save', function(next) {
 
 // Index for efficient queries
 timeLogSchema.index({ employeeId: 1, createdAt: -1 });
+timeLogSchema.index({ companyId: 1, createdAt: -1 });
 timeLogSchema.index({ status: 1 });
 
 module.exports = mongoose.model('TimeLog', timeLogSchema);

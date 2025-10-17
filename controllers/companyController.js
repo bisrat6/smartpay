@@ -89,7 +89,7 @@ const getCompanyStats = async (req, res) => {
     const Employee = require('../models/Employee');
     const employeeCount = await Employee.countDocuments({ 
       companyId: company._id, 
-      status: 'active' 
+      isActive: true 
     });
 
     // Get pending time logs count
