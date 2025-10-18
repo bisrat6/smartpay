@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, DollarSign } from 'lucide-react';
 import { paymentApi } from '@/lib/api';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const Payments = () => {
   const navigate = useNavigate();
@@ -19,18 +20,19 @@ const Payments = () => {
   const fetchMyPayments = async () => {
     try {
       const response = await paymentApi.getMyPayments();
-      setPayments(response.data);
-    } catch (error) {
+      setPayments(response.data.payments || []);
+    } catch (error: any) {
       console.error('Failed to fetch payments');
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to fetch payments');
     }
   };
 
   const totalEarnings = payments.reduce((sum, payment) => 
-    payment.status === 'disbursed' ? sum + payment.amount : sum, 0
+    payment.status === 'completed' ? sum + payment.amount : sum, 0
   );
 
   const pendingAmount = payments.reduce((sum, payment) => 
-    payment.status !== 'disbursed' ? sum + payment.amount : sum, 0
+    payment.status !== 'completed' ? sum + payment.amount : sum, 0
   );
 
   return (
@@ -105,14 +107,16 @@ const Payments = () => {
                   {payments.map((payment) => (
                     <TableRow key={payment._id}>
                       <TableCell className="font-medium">
-                        {format(new Date(payment.periodStart), 'PP')} - {format(new Date(payment.periodEnd), 'PP')}
+                        {format(new Date(payment.period.startDate), 'PP')} - {format(new Date(payment.period.endDate), 'PP')}
                       </TableCell>
-                      <TableCell>{payment.totalHours}</TableCell>
+                      <TableCell>{(payment.regularHours + payment.bonusHours).toFixed(2)}</TableCell>
                       <TableCell className="font-semibold">${payment.amount}</TableCell>
                       <TableCell>
                         <Badge variant={
-                          payment.status === 'disbursed' ? 'default' : 
+                          payment.status === 'completed' ? 'default' : 
                           payment.status === 'approved' ? 'secondary' : 
+                          payment.status === 'processing' ? 'secondary' :
+                          payment.status === 'failed' ? 'destructive' :
                           'outline'
                         }>
                           {payment.status}

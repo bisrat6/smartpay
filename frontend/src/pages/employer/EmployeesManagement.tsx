@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Plus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { employeeApi, jobRoleApi } from '@/lib/api';
@@ -16,11 +17,14 @@ const EmployeesManagement = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [employees, setEmployees] = useState<any[]>([]);
   const [jobRoles, setJobRoles] = useState<any[]>([]);
+  const [errors, setErrors] = useState<any>({});
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [selectedJobRole, setSelectedJobRole] = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [telebirrMsisdn, setTelebirrMsisdn] = useState('');
+  const [department, setDepartment] = useState('');
+  const [position, setPosition] = useState('');
 
   useEffect(() => {
     fetchEmployees();
@@ -30,7 +34,7 @@ const EmployeesManagement = () => {
   const fetchEmployees = async () => {
     try {
       const response = await employeeApi.list();
-      setEmployees(response.data);
+      setEmployees(response.data.employees || []);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to fetch employees');
     }
@@ -39,7 +43,7 @@ const EmployeesManagement = () => {
   const fetchJobRoles = async () => {
     try {
       const response = await jobRoleApi.list();
-      setJobRoles(response.data);
+      setJobRoles(response.data.jobRoles || []);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to fetch job roles');
     }
@@ -48,23 +52,39 @@ const EmployeesManagement = () => {
   const handleAddEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrors({});
 
     try {
       await employeeApi.add({
         name,
         email,
-        phone,
-        jobRoleId: selectedJobRole,
+        hourlyRate: parseFloat(hourlyRate),
+        telebirrMsisdn,
+        department,
+        position,
       });
       toast.success('Employee added successfully!');
       setDialogOpen(false);
       setName('');
       setEmail('');
-      setPhone('');
-      setSelectedJobRole('');
+      setHourlyRate('');
+      setTelebirrMsisdn('');
+      setDepartment('');
+      setPosition('');
+      setErrors({});
       fetchEmployees();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to add employee');
+      if (error?.response?.data?.errors) {
+        // Handle validation errors
+        const validationErrors: any = {};
+        error.response.data.errors.forEach((err: any) => {
+          validationErrors[err.path] = err.msg;
+        });
+        setErrors(validationErrors);
+        toast.error('Please fix the validation errors');
+      } else {
+        toast.error(error?.response?.data?.message || error?.message || 'Failed to add employee');
+      }
     } finally {
       setLoading(false);
     }
@@ -104,8 +124,10 @@ const EmployeesManagement = () => {
                       placeholder="John Doe"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      className={errors.name ? 'border-red-500' : ''}
                       required
                     />
+                    {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -115,36 +137,59 @@ const EmployeesManagement = () => {
                       placeholder="john@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      className={errors.email ? 'border-red-500' : ''}
                       required
                     />
+                    {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="hourlyRate">Hourly Rate (ETB)</Label>
                     <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+251911234567"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      id="hourlyRate"
+                      type="number"
+                      step="0.01"
+                      placeholder="50.00"
+                      value={hourlyRate}
+                      onChange={(e) => setHourlyRate(e.target.value)}
+                      className={errors.hourlyRate ? 'border-red-500' : ''}
                       required
                     />
+                    {errors.hourlyRate && <p className="text-sm text-red-500">{errors.hourlyRate}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="jobRole">Job Role</Label>
-                    <select
-                      id="jobRole"
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2"
-                      value={selectedJobRole}
-                      onChange={(e) => setSelectedJobRole(e.target.value)}
+                    <Label htmlFor="telebirrMsisdn">Telebirr Number</Label>
+                    <Input
+                      id="telebirrMsisdn"
+                      type="tel"
+                      placeholder="251911234567"
+                      value={telebirrMsisdn}
+                      onChange={(e) => setTelebirrMsisdn(e.target.value)}
+                      className={errors.telebirrMsisdn ? 'border-red-500' : ''}
                       required
-                    >
-                      <option value="">Select a role</option>
-                      {jobRoles.map((role) => (
-                        <option key={role._id} value={role._id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
+                    {errors.telebirrMsisdn && <p className="text-sm text-red-500">{errors.telebirrMsisdn}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department</Label>
+                    <Input
+                      id="department"
+                      placeholder="Engineering"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                      className={errors.department ? 'border-red-500' : ''}
+                    />
+                    {errors.department && <p className="text-sm text-red-500">{errors.department}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="position">Position</Label>
+                    <Input
+                      id="position"
+                      placeholder="Software Developer"
+                      value={position}
+                      onChange={(e) => setPosition(e.target.value)}
+                      className={errors.position ? 'border-red-500' : ''}
+                    />
+                    {errors.position && <p className="text-sm text-red-500">{errors.position}</p>}
                   </div>
                 </div>
                 <DialogFooter>
@@ -179,17 +224,25 @@ const EmployeesManagement = () => {
                   <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Job Role</TableHead>
+                    <TableHead>Hourly Rate</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Position</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {employees.map((employee) => (
                     <TableRow key={employee._id}>
-                      <TableCell className="font-medium">{employee.userId?.name}</TableCell>
-                      <TableCell>{employee.userId?.email}</TableCell>
-                      <TableCell>{employee.userId?.phone}</TableCell>
-                      <TableCell>{employee.jobRoleId?.name || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">{employee.name}</TableCell>
+                      <TableCell>{employee.email}</TableCell>
+                      <TableCell>ETB {employee.hourlyRate}</TableCell>
+                      <TableCell>{employee.department || 'N/A'}</TableCell>
+                      <TableCell>{employee.position || 'N/A'}</TableCell>
+                      <TableCell>
+                        <Badge variant={employee.isActive ? 'default' : 'secondary'}>
+                          {employee.isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

@@ -1,6 +1,52 @@
 const { validationResult } = require('express-validator');
 const Company = require('../models/Company');
 
+// Create company
+const createCompany = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { name, employerName, paymentCycle, bonusRateMultiplier, maxDailyHours, arifpayMerchantKey } = req.body;
+
+    // Check if company already exists for this employer
+    const existingCompany = await Company.findOne({ employerId: req.user._id });
+    if (existingCompany) {
+      return res.status(400).json({ message: 'Company already exists for this employer' });
+    }
+
+    // Create company
+    const company = new Company({
+      name,
+      employerName: employerName || req.user.name,
+      employerId: req.user._id,
+      paymentCycle: paymentCycle || 'monthly',
+      bonusRateMultiplier: bonusRateMultiplier || 1.5,
+      maxDailyHours: maxDailyHours || 8,
+      arifpayMerchantKey: arifpayMerchantKey || ''
+    });
+
+    await company.save();
+
+    res.status(201).json({
+      message: 'Company created successfully',
+      company: {
+        id: company._id,
+        name: company.name,
+        employerName: company.employerName,
+        paymentCycle: company.paymentCycle,
+        bonusRateMultiplier: company.bonusRateMultiplier,
+        maxDailyHours: company.maxDailyHours
+      }
+    });
+  } catch (error) {
+    console.error('Create company error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // Get company by ID
 const getCompany = async (req, res) => {
   try {
@@ -122,6 +168,7 @@ const getCompanyStats = async (req, res) => {
 };
 
 module.exports = {
+  createCompany,
   getCompany,
   getMyCompany,
   updateCompany,

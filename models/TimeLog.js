@@ -53,6 +53,34 @@ const timeLogSchema = new mongoose.Schema({
   },
   approvedAt: {
     type: Date
+  },
+  breaks: [{
+    startTime: {
+      type: Date,
+      required: true
+    },
+    endTime: {
+      type: Date,
+      validate: {
+        validator: function(value) {
+          return !value || value > this.startTime;
+        },
+        message: 'Break end time must be after break start time'
+      }
+    },
+    duration: {
+      type: Number, // in hours
+      default: 0
+    },
+    type: {
+      type: String,
+      enum: ['lunch', 'coffee', 'personal', 'other'],
+      default: 'lunch'
+    }
+  }],
+  totalBreakTime: {
+    type: Number, // in hours
+    default: 0
   }
 }, {
   timestamps: true
@@ -61,10 +89,27 @@ const timeLogSchema = new mongoose.Schema({
 // Calculate duration when clockOut is set
 timeLogSchema.pre('save', function(next) {
   if (this.clockOut && this.clockIn) {
-    this.duration = (this.clockOut - this.clockIn) / 3600000; // Convert ms to hours
+    // Calculate total break time
+    this.totalBreakTime = this.breaks.reduce((total, breakItem) => {
+      if (breakItem.endTime) {
+        return total + ((breakItem.endTime - breakItem.startTime) / 3600000);
+      }
+      return total;
+    }, 0);
+    
+    // Calculate work duration (total time minus breaks)
+    this.duration = ((this.clockOut - this.clockIn) / 3600000) - this.totalBreakTime;
     this.regularHours = Math.min(this.duration, 8);
     this.bonusHours = Math.max(0, this.duration - 8);
   }
+  
+  // Calculate break durations
+  this.breaks.forEach(breakItem => {
+    if (breakItem.endTime) {
+      breakItem.duration = (breakItem.endTime - breakItem.startTime) / 3600000;
+    }
+  });
+  
   next();
 });
 

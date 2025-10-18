@@ -14,6 +14,21 @@ const EmployeeDashboard = () => {
   const [onBreak, setOnBreak] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    checkClockStatus();
+  }, []);
+
+  const checkClockStatus = async () => {
+    try {
+      const response = await timeLogApi.getMyStatus();
+      if (response.data.isClockedIn) {
+        setActiveLog(response.data.currentLog);
+      }
+    } catch (error) {
+      console.error('Failed to check clock status:', error);
+    }
+  };
+
   const handleLogout = () => {
     removeToken();
     toast.success('Logged out successfully');
@@ -23,14 +38,11 @@ const EmployeeDashboard = () => {
   const handleClockIn = async () => {
     setLoading(true);
     try {
-      const response = await timeLogApi.clockIn({
-        method: 'qr',
-        location: { lat: 8.901, lng: 38.751 }
-      });
-      setActiveLog(response.data);
+      const response = await timeLogApi.clockIn();
+      setActiveLog(response.data.timeLog);
       toast.success('Clocked in successfully!');
     } catch (error: any) {
-      toast.error(error.response?.data?.msg || 'Failed to clock in');
+      toast.error(error.response?.data?.message || error.message || 'Failed to clock in');
     } finally {
       setLoading(false);
     }
@@ -40,12 +52,12 @@ const EmployeeDashboard = () => {
     if (!activeLog) return;
     setLoading(true);
     try {
-      await timeLogApi.clockOut(activeLog._id);
+      await timeLogApi.clockOut();
       setActiveLog(null);
       setOnBreak(false);
       toast.success('Clocked out successfully!');
     } catch (error: any) {
-      toast.error(error.response?.data?.msg || 'Failed to clock out');
+      toast.error(error.response?.data?.message || error.message || 'Failed to clock out');
     } finally {
       setLoading(false);
     }
@@ -55,11 +67,11 @@ const EmployeeDashboard = () => {
     if (!activeLog) return;
     setLoading(true);
     try {
-      await timeLogApi.startBreak(activeLog._id, { type: 'lunch' });
+      await timeLogApi.startBreak({ type: 'lunch' });
       setOnBreak(true);
       toast.success('Break started');
     } catch (error: any) {
-      toast.error(error.response?.data?.msg || 'Failed to start break');
+      toast.error(error.response?.data?.message || error.message || 'Failed to start break');
     } finally {
       setLoading(false);
     }
@@ -69,11 +81,11 @@ const EmployeeDashboard = () => {
     if (!activeLog) return;
     setLoading(true);
     try {
-      await timeLogApi.endBreak(activeLog._id);
+      await timeLogApi.endBreak();
       setOnBreak(false);
       toast.success('Break ended');
     } catch (error: any) {
-      toast.error(error.response?.data?.msg || 'Failed to end break');
+      toast.error(error.response?.data?.message || error.message || 'Failed to end break');
     } finally {
       setLoading(false);
     }

@@ -13,6 +13,8 @@ import CompanyManagement from "./pages/employer/CompanyManagement";
 import EmployeesManagement from "./pages/employer/EmployeesManagement";
 import TimeLogsManagement from "./pages/employer/TimeLogsManagement";
 import PaymentsManagement from "./pages/employer/PaymentsManagement";
+import PaymentDetails from "./pages/employer/PaymentDetails";
+import PayrollSummary from "./pages/employer/PayrollSummary";
 import Analytics from "./pages/employer/Analytics";
 import TimeLogs from "./pages/employee/TimeLogs";
 import Payments from "./pages/employee/Payments";
@@ -65,6 +67,16 @@ const App = () => {
             <Route path="/employer/payments" element={
               <ProtectedRoute requiredRole="employer">
                 <PaymentsManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/employer/payments/:id" element={
+              <ProtectedRoute requiredRole="employer">
+                <PaymentDetails />
+              </ProtectedRoute>
+            } />
+            <Route path="/employer/payroll-summary" element={
+              <ProtectedRoute requiredRole="employer">
+                <PayrollSummary />
               </ProtectedRoute>
             } />
             <Route path="/employer/analytics" element={

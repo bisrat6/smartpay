@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Users, Clock, DollarSign, BarChart3, LogOut } from 'lucide-react';
+import { Building2, Users, Clock, DollarSign, BarChart3, LogOut, CreditCard, PieChart, TrendingUp } from 'lucide-react';
 import { removeToken, getCurrentUser } from '@/lib/auth';
 import { toast } from 'sonner';
 
@@ -43,6 +43,13 @@ const EmployerDashboard = () => {
       icon: DollarSign,
       link: '/employer/payments',
       color: 'text-amber-600',
+    },
+    {
+      title: 'Payroll Summary',
+      description: 'View payment analytics',
+      icon: PieChart,
+      link: '/employer/payroll-summary',
+      color: 'text-cyan-600',
     },
     {
       title: 'Analytics',

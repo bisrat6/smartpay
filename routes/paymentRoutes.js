@@ -9,16 +9,24 @@ const {
   handleWebhook,
   retryFailedPayments,
   approvePayment,
-  approvePaymentsForPeriod
+  approvePaymentsForPeriod,
+  getMyPayments
 } = require('../controllers/paymentController');
 
-const { authMiddleware, employerOnly } = require('../middleware/authMiddleware');
+const { authMiddleware, employerOnly, employeeOnly } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
 const approvePaymentValidation = [
   body('paymentId').isMongoId().withMessage('Valid payment ID is required')
 ];
+
+// ============================================
+// EMPLOYEE ROUTES (Authentication Required)
+// ============================================
+
+// Get my payments (employee only)
+router.get('/my', authMiddleware, employeeOnly, getMyPayments);
 
 // ============================================
 // EMPLOYER ROUTES (Authentication Required)

@@ -1,6 +1,6 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { clockIn, clockOut, getTimeLogs, getCompanyTimeLogs, approveTimeLog, getClockStatus } = require('../controllers/timeLogController');
+const { clockIn, clockOut, getTimeLogs, getCompanyTimeLogs, approveTimeLog, getClockStatus, startBreak, endBreak } = require('../controllers/timeLogController');
 const { authMiddleware, employerOnly, employeeOnly } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -14,6 +14,8 @@ const approveTimeLogValidation = [
 // Employee routes
 router.post('/clock-in', authMiddleware, employeeOnly, clockIn);
 router.post('/clock-out', authMiddleware, employeeOnly, clockOut);
+router.post('/start-break', authMiddleware, employeeOnly, startBreak);
+router.post('/end-break', authMiddleware, employeeOnly, endBreak);
 router.get('/my/status', authMiddleware, employeeOnly, getClockStatus);
 router.get('/my', authMiddleware, employeeOnly, getTimeLogs);
 

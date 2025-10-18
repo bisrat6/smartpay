@@ -20,8 +20,8 @@ const TimeLogsManagement = () => {
 
   const fetchPendingLogs = async () => {
     try {
-      const response = await timeLogApi.getPending();
-      setLogs(response.data);
+      const response = await timeLogApi.getCompanyLogs({ status: 'pending' });
+      setLogs(response.data.timeLogs || []);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to fetch logs');
     }
@@ -30,7 +30,7 @@ const TimeLogsManagement = () => {
   const handleApprove = async (logId: string) => {
     setLoading(true);
     try {
-      await timeLogApi.approve(logId);
+      await timeLogApi.approve(logId, { status: 'approved' });
       toast.success('Time log approved!');
       fetchPendingLogs();
     } catch (error: any) {

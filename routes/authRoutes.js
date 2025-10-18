@@ -9,10 +9,7 @@ const router = express.Router();
 const signupValidation = [
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('role').equals('employer').withMessage('Only employers can self-register. Employees are created by employers.'),
-  body('companyName').notEmpty().withMessage('Company name is required'),
-  body('employerName').notEmpty().withMessage('Employer name is required'),
-  body('arifpayMerchantKey').notEmpty().withMessage('Arifpay merchant key is required')
+  body('name').notEmpty().withMessage('Name is required')
 ];
 
 const loginValidation = [

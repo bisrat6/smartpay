@@ -6,7 +6,7 @@ const Company = require('../models/Company');
 // Clock in
 const clockIn = async (req, res) => {
   try {
-    const { companyId: companyIdParam } = req.body;
+    const { companyId: companyIdParam } = req.body || {};
     // If the user has multiple companies, require explicit companyId
     let employee;
     if (companyIdParam) {
@@ -65,7 +65,7 @@ const clockIn = async (req, res) => {
 // Clock out
 const clockOut = async (req, res) => {
   try {
-    const { companyId: companyIdParam } = req.body;
+    const { companyId: companyIdParam } = req.body || {};
     let employee;
     if (companyIdParam) {
       employee = await Employee.findOne({ userId: req.user._id, companyId: companyIdParam });
@@ -228,6 +228,11 @@ const approveTimeLog = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    // Check if time log has clockOut before allowing approval
+    if (status === 'approved' && !timeLog.clockOut) {
+      return res.status(400).json({ message: 'Cannot approve time log without clock out time' });
+    }
+
     // Update time log
     timeLog.status = status;
     timeLog.notes = notes;
@@ -280,11 +285,135 @@ const getClockStatus = async (req, res) => {
   }
 };
 
+// Start break
+const startBreak = async (req, res) => {
+  try {
+    const { companyId: companyIdParam, type = 'lunch' } = req.body || {};
+    let employee;
+    if (companyIdParam) {
+      employee = await Employee.findOne({ userId: req.user._id, companyId: companyIdParam });
+    } else {
+      const employees = await Employee.find({ userId: req.user._id });
+      if (employees.length > 1) {
+        return res.status(400).json({ message: 'Multiple employments found. Please specify companyId.' });
+      }
+      employee = employees[0];
+    }
+    
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee record not found' });
+    }
+
+    // Find today's active time log
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timeLog = await TimeLog.findOne({
+      employeeId: employee._id,
+      clockIn: { $gte: today, $lt: tomorrow },
+      clockOut: { $exists: false }
+    });
+
+    if (!timeLog) {
+      return res.status(400).json({ message: 'No active clock in found for today' });
+    }
+
+    // Check if already on break
+    const activeBreak = timeLog.breaks.find(breakItem => !breakItem.endTime);
+    if (activeBreak) {
+      return res.status(400).json({ message: 'Already on break' });
+    }
+
+    // Add break
+    timeLog.breaks.push({
+      startTime: new Date(),
+      type
+    });
+
+    await timeLog.save();
+
+    res.json({
+      message: 'Break started successfully',
+      break: {
+        startTime: timeLog.breaks[timeLog.breaks.length - 1].startTime,
+        type
+      }
+    });
+  } catch (error) {
+    console.error('Start break error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// End break
+const endBreak = async (req, res) => {
+  try {
+    const { companyId: companyIdParam } = req.body || {};
+    let employee;
+    if (companyIdParam) {
+      employee = await Employee.findOne({ userId: req.user._id, companyId: companyIdParam });
+    } else {
+      const employees = await Employee.find({ userId: req.user._id });
+      if (employees.length > 1) {
+        return res.status(400).json({ message: 'Multiple employments found. Please specify companyId.' });
+      }
+      employee = employees[0];
+    }
+    
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee record not found' });
+    }
+
+    // Find today's active time log
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const timeLog = await TimeLog.findOne({
+      employeeId: employee._id,
+      clockIn: { $gte: today, $lt: tomorrow },
+      clockOut: { $exists: false }
+    });
+
+    if (!timeLog) {
+      return res.status(400).json({ message: 'No active clock in found for today' });
+    }
+
+    // Find active break
+    const activeBreak = timeLog.breaks.find(breakItem => !breakItem.endTime);
+    if (!activeBreak) {
+      return res.status(400).json({ message: 'No active break found' });
+    }
+
+    // End break
+    activeBreak.endTime = new Date();
+    await timeLog.save();
+
+    res.json({
+      message: 'Break ended successfully',
+      break: {
+        startTime: activeBreak.startTime,
+        endTime: activeBreak.endTime,
+        duration: activeBreak.duration,
+        type: activeBreak.type
+      }
+    });
+  } catch (error) {
+    console.error('End break error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   clockIn,
   clockOut,
   getTimeLogs,
   getCompanyTimeLogs,
   approveTimeLog,
-  getClockStatus
+  getClockStatus,
+  startBreak,
+  endBreak
 };

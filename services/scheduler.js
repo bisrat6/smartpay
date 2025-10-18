@@ -8,7 +8,7 @@ const schedulePayrollProcessing = () => {
   console.log('Setting up payroll processing scheduler...');
 
   // Daily payroll processing - runs every midnight
-  cron.schedule('* * * * *', async () => {
+  cron.schedule('0 0 * * 0', async () => {
     console.log('Running daily payroll processing...');
     await processPayrollForCycle('daily');
   }, {

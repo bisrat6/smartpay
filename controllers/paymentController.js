@@ -287,6 +287,47 @@ const retryFailedPayments = async (req, res) => {
   }
 };
 
+// Get my payments (employee only)
+const getMyPayments = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    
+    // Get employee record
+    const employee = await Employee.findOne({ userId: req.user._id });
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee record not found' });
+    }
+
+    // Build query
+    const query = { employeeId: employee._id };
+    if (status) {
+      query.status = status;
+    }
+
+    // Get payments with pagination
+    const skip = (page - 1) * limit;
+    const payments = await Payment.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate('employeeId', 'name email');
+
+    const total = await Payment.countDocuments(query);
+
+    res.json({
+      payments,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total
+      }
+    });
+  } catch (error) {
+    console.error('Get my payments error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // ============================================
 // MODULE EXPORTS
 // ============================================
@@ -297,6 +338,7 @@ module.exports = {
   getPayment,
   approvePayment,
   approvePaymentsForPeriod,
+  getMyPayments,
   
   // Payroll processing
   processPayroll,

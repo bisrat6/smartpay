@@ -19,7 +19,7 @@ const TimeLogs = () => {
   const fetchMyLogs = async () => {
     try {
       const response = await timeLogApi.getMyLogs();
-      setLogs(response.data);
+      setLogs(response.data.timeLogs || []);
     } catch (error) {
       console.error('Failed to fetch logs');
     }

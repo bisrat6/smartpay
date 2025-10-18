@@ -4,8 +4,14 @@ const User = require('../models/User');
 const Company = require('../models/Company');
 
 // Generate JWT token
-const generateToken = (userId) => {
-  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const generateToken = (user) => {
+  return jwt.sign({ 
+    userId: user._id,
+    id: user._id,
+    email: user.email,
+    role: user.role,
+    companyId: user.companyId
+  }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
 // Signup
@@ -16,7 +22,7 @@ const signup = async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password, companyName, employerName, arifpayMerchantKey } = req.body;
+    const { email, password, name } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -33,20 +39,11 @@ const signup = async (req, res) => {
 
     await user.save();
 
-    // Create company
-    const company = new Company({
-      name: companyName,
-      employerName,
-      employerId: user._id,
-      arifpayMerchantKey
-    });
-    await company.save();
-
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.status(201).json({
-      message: 'User created successfully',
+      message: 'User created successfully. Please complete your company setup.',
       token,
       user: {
         id: user._id,
@@ -88,7 +85,7 @@ const login = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken(user._id);
+    const token = generateToken(user);
 
     res.json({
       message: 'Login successful',

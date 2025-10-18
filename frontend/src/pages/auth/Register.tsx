@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/api';
 import { setToken, decodeToken, isAuthenticated, getCurrentUser } from '@/lib/auth';
@@ -15,8 +14,6 @@ const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState<'employer' | 'employee'>('employee');
   const [loading, setLoading] = useState(false);
 
   // If already authenticated, redirect to appropriate dashboard
@@ -32,20 +29,21 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const data: any = { name, email, password, role };
-      if (role === 'employee' && phone) {
-        data.phone = phone;
-      }
+      const data = { 
+        email, 
+        password, 
+        name
+      };
 
       const response = await authApi.register(data);
       const token = response.data.token;
       setToken(token);
       
       const user = decodeToken(token);
-      toast.success('Account created successfully!');
+      toast.success('Account created successfully! Please complete your company setup.');
       
-      // Redirect based on role
-      navigate(user?.role === 'employer' ? '/employer' : '/employee', { replace: true });
+      // Redirect to company setup
+      navigate('/employer/company', { replace: true });
     } catch (error: any) {
       const apiMessage = error?.response?.data?.message;
       const fallback = error?.message === 'Network Error' ? 'Network error: cannot reach server' : error?.message;
@@ -66,25 +64,11 @@ const Register = () => {
           </div>
           <CardTitle className="text-2xl text-center">Create an account</CardTitle>
           <CardDescription className="text-center">
-            Get started with SiraFlow today
+            Create your account to get started
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>I am a</Label>
-              <RadioGroup value={role} onValueChange={(value) => setRole(value as 'employer' | 'employee')}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="employer" id="employer" />
-                  <Label htmlFor="employer" className="font-normal cursor-pointer">Employer</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="employee" id="employee" />
-                  <Label htmlFor="employee" className="font-normal cursor-pointer">Employee</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
@@ -107,19 +91,6 @@ const Register = () => {
                 required
               />
             </div>
-
-            {role === 'employee' && (
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+251911234567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-            )}
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
