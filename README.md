@@ -45,8 +45,8 @@ To get Siraflow up and running locally:
 
 1. **Clone the Repository**:
    ```
-   git clone https://github.com/bisrat6/smartpay.git
-   cd smartpay
+   git clone https://github.com/bisrat6/SiraFlow
+   cd Siraflow
    ```
 
 2. **Install Dependencies**:
