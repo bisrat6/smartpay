@@ -1,5 +1,3 @@
----
-
 # Quality Assurance Test Report
 
 **Project:** SiraFlow – Payroll and Time Management System
@@ -7,8 +5,6 @@
 **Test Phase:** System & Acceptance Testing
 **Date:** 2025
 **Version Tested:** Final Release Candidate
-
----
 
 ## 1. Introduction
 
@@ -202,5 +198,6 @@ Bisrat
 **Project Status:** ✅ Accepted for Release
 
 ---
+
 
 
