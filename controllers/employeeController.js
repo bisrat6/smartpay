@@ -11,10 +11,9 @@ const generatePassword = () => {
   if (process.env.NODE_ENV === "development") {
     return "Password123!";
   }
-  // use this if its in production mode
-  if (process.env.NODE_ENV === "production") {
-    return Math.random().toString(36).slice(-10);
-  }
+  // use this if its in production mode or any other mode
+  // Default to random password for security
+  return Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
 }
 
 // Add new employee

@@ -1,11 +1,27 @@
 import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import api from "@/lib/api";
-import { Building2, Users, CreditCard, TrendingUp, CheckCircle, XCircle, Clock } from "lucide-react";
+import api, { superAdminApi } from "@/lib/api";
+import { toast } from "sonner";
+import { getCurrentUser } from "@/lib/auth";
+import {
+  Building2,
+  Users,
+  CreditCard,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  Clock,
+} from "lucide-react";
 
 interface DashboardStats {
   companies: {
@@ -36,15 +52,22 @@ const SuperAdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const user = getCurrentUser();
+    if (!user) {
+      toast.error("Not authenticated");
+      setLoading(false);
+      return;
+    }
     fetchDashboardStats();
   }, []);
 
   const fetchDashboardStats = async () => {
     try {
-      const response = await api.get("/super-admin/dashboard/stats");
+      const response = await superAdminApi.getDashboardStats();
       setStats(response.data.stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
+      toast.error((error as any)?.message || "Failed to load dashboard stats");
     } finally {
       setLoading(false);
     }
@@ -64,7 +87,9 @@ const SuperAdminDashboard = () => {
     <DashboardLayout role="super_admin">
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Super Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Super Admin Dashboard
+          </h1>
           <p className="text-muted-foreground">
             Platform overview and management
           </p>
@@ -74,7 +99,9 @@ const SuperAdminDashboard = () => {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Companies</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Companies
+              </CardTitle>
               <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -108,26 +135,35 @@ const SuperAdminDashboard = () => {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Subscriptions</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Subscriptions
+              </CardTitle>
               <CreditCard className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.subscriptions.active}</div>
+              <div className="text-2xl font-bold">
+                {stats?.subscriptions.active}
+              </div>
               <div className="flex gap-2 mt-2 text-xs text-muted-foreground">
                 <span>{stats?.subscriptions.trial} on trial</span>
-                <span className="text-red-500">{stats?.subscriptions.expired} expired</span>
+                <span className="text-red-500">
+                  {stats?.subscriptions.expired} expired
+                </span>
               </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Monthly Revenue
+              </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {stats?.revenue.currency} {stats?.revenue.monthly.toLocaleString()}
+                {stats?.revenue.currency}{" "}
+                {stats?.revenue.monthly.toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 From {stats?.subscriptions.active} active subscriptions
@@ -187,7 +223,9 @@ const SuperAdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <Button asChild>
-                  <a href="/super-admin/subscriptions">View All Subscriptions</a>
+                  <a href="/super-admin/subscriptions">
+                    View All Subscriptions
+                  </a>
                 </Button>
               </CardContent>
             </Card>
@@ -215,4 +253,3 @@ const SuperAdminDashboard = () => {
 };
 
 export default SuperAdminDashboard;
-

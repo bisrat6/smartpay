@@ -9,6 +9,8 @@ const Employee = require('../models/Employee');
 const JobRole = require('../models/JobRole');
 const TimeLog = require('../models/TimeLog');
 const Payment = require('../models/Payment');
+const Subscription = require('../models/Subscription');
+const { getPlan } = require('../config/subscriptionPlans');
 const payrollService = require('../services/payrollService');
 
 async function seed() {
@@ -22,7 +24,8 @@ async function seed() {
       Employee.deleteMany({}),
       JobRole.deleteMany({}),
       TimeLog.deleteMany({}),
-      Payment.deleteMany({})
+      Payment.deleteMany({}),
+      Subscription.deleteMany({})
     ]);
 
     console.log('Creating employer user and company...');
@@ -39,8 +42,46 @@ async function seed() {
       paymentCycle: 'monthly',
       bonusRateMultiplier: 1.5,
       maxDailyHours: 8,
-      arifpayMerchantKey: process.env.ARIFPAY_MERCHANT_KEY || 'demo_key'
+      arifpayMerchantKey: process.env.ARIFPAY_MERCHANT_KEY || 'demo_key',
+      verificationStatus: 'pending',
+      isActive: true,
+      onboardingCompleted: false,
+      size: '1-10'
     });
+
+    // Create subscription for the company (matching API flow)
+    console.log('Creating subscription for company...');
+    const planConfig = getPlan('free');
+    const now = new Date();
+    const trialEnd = new Date(now);
+    trialEnd.setDate(trialEnd.getDate() + planConfig.trialDays);
+    const periodEnd = new Date(now);
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+    const subscription = await Subscription.create({
+      companyId: company._id,
+      plan: planConfig.id,
+      status: planConfig.trialDays > 0 ? 'trial' : 'active',
+      limits: {
+        maxEmployees: planConfig.maxEmployees,
+        maxMonthlyPayments: planConfig.maxMonthlyPayments,
+        features: planConfig.features
+      },
+      pricing: {
+        amount: planConfig.price === 'custom' ? 0 : planConfig.price,
+        currency: planConfig.currency,
+        billingCycle: planConfig.billingCycle
+      },
+      currentPeriod: {
+        start: now,
+        end: periodEnd
+      },
+      trialEndsAt: planConfig.trialDays > 0 ? trialEnd : null
+    });
+
+    // Update company with subscription reference
+    company.subscriptionId = subscription._id;
+    await company.save();
 
     console.log('Creating job roles...');
     const jobRolesData = [
@@ -118,10 +159,10 @@ async function seed() {
     }
 
     console.log('Creating time logs for the past 7 days with different statuses...');
-    const now = new Date();
     const logsToInsert = [];
     
-    // Create time logs with different statuses to demonstrate the workflow
+    // Create time logs - all start as pending, then some get approved
+    // Never create logs as 'paid' directly - they only become paid when payment completes
     for (let dayOffset = 1; dayOffset <= 7; dayOffset += 1) {
       for (let empIndex = 0; empIndex < employees.length; empIndex += 1) {
         const emp = employees[empIndex];
@@ -130,14 +171,24 @@ async function seed() {
         const clockIn = new Date(date.setHours(9, 0, 0, 0));
         const clockOut = new Date(new Date(clockIn).setHours(clockIn.getHours() + 8 + Math.random() * 2)); // 8-10 hours
 
-        // Different statuses based on day and employee
-        let status = 'pending';
-        if (dayOffset <= 3) {
-          status = 'approved'; // Recent days - approved
-        } else if (dayOffset <= 5) {
-          status = 'paid'; // Older days - already paid
-        } else {
-          status = 'pending'; // Very recent - still pending
+        // Determine if this log should be approved (based on day offset)
+        // Days 1-5: approved (ready for payment)
+        // Days 6-7: pending (still needs approval)
+        const shouldApprove = dayOffset <= 5;
+
+        // Add some break data to demonstrate the feature (for some logs)
+        const breaks = [];
+        if (dayOffset <= 3 && Math.random() > 0.5) {
+          // Add a lunch break for some logs
+          const breakStart = new Date(clockIn);
+          breakStart.setHours(12, 0, 0, 0);
+          const breakEnd = new Date(breakStart);
+          breakEnd.setHours(13, 0, 0, 0);
+          breaks.push({
+            startTime: breakStart,
+            endTime: breakEnd,
+            type: 'lunch'
+          });
         }
 
         logsToInsert.push({
@@ -145,25 +196,25 @@ async function seed() {
           companyId: company._id,
           clockIn,
           clockOut,
-          status,
-          approvedBy: status !== 'pending' ? employer._id : undefined,
-          approvedAt: status !== 'pending' ? new Date(date.getTime() + 24 * 60 * 60 * 1000) : undefined
+          status: shouldApprove ? 'approved' : 'pending',
+          breaks: breaks,
+          approvedBy: shouldApprove ? employer._id : undefined,
+          approvedAt: shouldApprove ? new Date(date.getTime() + 24 * 60 * 60 * 1000) : undefined
         });
       }
     }
 
+    // Insert logs and let pre-save hook calculate duration/regularHours/bonusHours
     const createdLogs = await TimeLog.insertMany(logsToInsert);
-    // Trigger duration/regular/bonus via manual recompute since pre-save doesn't run on insertMany without hooks
+    // Save each log individually to trigger pre-save hook for calculations
     for (const log of createdLogs) {
-      log.duration = (log.clockOut - log.clockIn) / 3600000;
-      log.regularHours = Math.min(log.duration, 8);
-      log.bonusHours = Math.max(0, log.duration - 8);
-      await log.save();
+      await log.save(); // Pre-save hook will calculate duration, regularHours, bonusHours, totalBreakTime
     }
 
-    console.log('Creating payments using the new payroll service...');
+    console.log('Creating payments from approved time logs...');
     
-    // Create payments for approved time logs (demonstrating the new architecture)
+    // Create payments for approved time logs following proper workflow
+    const allPayments = [];
     for (const emp of employees) {
       // Get approved time logs for this employee
       const approvedLogs = await TimeLog.find({ 
@@ -172,7 +223,7 @@ async function seed() {
       });
       
       if (approvedLogs.length > 0) {
-        // Group logs by day to create daily payments (as per new architecture)
+        // Group logs by day to create daily payments
         const logsByDay = {};
         approvedLogs.forEach(log => {
           const dayKey = log.clockIn.toDateString();
@@ -190,7 +241,7 @@ async function seed() {
           const endDate = new Date(logDate);
           endDate.setHours(23, 59, 59, 999);
 
-          // Calculate payment manually since we already have the approved logs
+          // Calculate payment amounts
           const totalRegularHours = dayLogs.reduce((sum, log) => sum + log.regularHours, 0);
           const totalBonusHours = dayLogs.reduce((sum, log) => sum + log.bonusHours, 0);
           
@@ -210,93 +261,76 @@ async function seed() {
           const bonusPay = (totalBonusHours * overtimeRate) + roleBonus;
           const totalPay = regularPay + bonusPay;
 
-          await Payment.create({
+          // Determine payment status based on day offset to show different workflow states
+          // Days 1-2: completed (oldest, already processed)
+          // Days 3-4: processing (in progress)
+          // Days 5: approved (ready to process)
+          // Note: We'll create all as pending first, then update some
+          const dayOffset = Math.floor((now - logDate) / (1000 * 60 * 60 * 24));
+          let paymentStatus = 'pending';
+          let approvedBy = undefined;
+          let approvedAt = undefined;
+          let arifpaySessionId = undefined;
+          let arifpayTransactionId = undefined;
+          let paymentDate = undefined;
+
+          if (dayOffset >= 1 && dayOffset <= 2) {
+            // Completed payments (oldest days)
+            paymentStatus = 'completed';
+            approvedBy = employer._id;
+            approvedAt = new Date(logDate.getTime() + 24 * 60 * 60 * 1000);
+            arifpayTransactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            paymentDate = new Date(logDate.getTime() + 2 * 24 * 60 * 60 * 1000);
+          } else if (dayOffset >= 3 && dayOffset <= 4) {
+            // Processing payments
+            paymentStatus = 'processing';
+            approvedBy = employer._id;
+            approvedAt = new Date(logDate.getTime() + 24 * 60 * 60 * 1000);
+            arifpaySessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          } else if (dayOffset === 5) {
+            // Approved payments (ready to process)
+            paymentStatus = 'approved';
+            approvedBy = employer._id;
+            approvedAt = new Date(logDate.getTime() + 24 * 60 * 60 * 1000);
+          }
+          // dayOffset > 5 stays as 'pending'
+
+          const payment = await Payment.create({
             employeeId: emp._id,
             amount: totalPay,
             period: {
               startDate,
               endDate
             },
-            status: 'pending', // Will need employer approval
-            regularHours: totalRegularHours,
-            bonusHours: totalBonusHours,
-            hourlyRate: baseRate,
-            bonusRateMultiplier: company.bonusRateMultiplier, // Stored for audit trail
-            timeLogIds: dayLogs.map(log => log._id)
-          });
-          
-          console.log(`Created pending payment for ${employeeWithRole.name} on ${dayKey}: $${totalPay.toFixed(2)}`);
-        }
-      }
-    }
-
-    // Create some completed payments for the "paid" time logs
-    console.log('Creating completed payments for paid time logs...');
-    for (const emp of employees) {
-      const paidLogs = await TimeLog.find({ 
-        employeeId: emp._id, 
-        status: 'paid' 
-      });
-      
-      if (paidLogs.length > 0) {
-        // Group by day
-        const logsByDay = {};
-        paidLogs.forEach(log => {
-          const dayKey = log.clockIn.toDateString();
-          if (!logsByDay[dayKey]) {
-            logsByDay[dayKey] = [];
-          }
-          logsByDay[dayKey].push(log);
-        });
-
-        for (const [dayKey, dayLogs] of Object.entries(logsByDay)) {
-          const logDate = new Date(dayKey);
-          const startDate = new Date(logDate);
-          startDate.setHours(0, 0, 0, 0);
-          const endDate = new Date(logDate);
-          endDate.setHours(23, 59, 59, 999);
-
-          // Calculate payment manually
-          const totalRegularHours = dayLogs.reduce((sum, log) => sum + log.regularHours, 0);
-          const totalBonusHours = dayLogs.reduce((sum, log) => sum + log.bonusHours, 0);
-          
-          // Get employee with job role for proper rate calculation
-          const employeeWithRole = await Employee.findById(emp._id).populate('jobRoleId');
-          let baseRate = employeeWithRole.hourlyRate ?? 0;
-          let overtimeRate = 0;
-          let roleBonus = 0;
-
-          if (employeeWithRole.jobRoleId && employeeWithRole.jobRoleId.defaultRates) {
-            baseRate = employeeWithRole.jobRoleId.defaultRates.base ?? baseRate;
-            overtimeRate = employeeWithRole.jobRoleId.defaultRates.overtime ?? 0;
-            roleBonus = employeeWithRole.jobRoleId.defaultRates.roleBonus ?? 0;
-          }
-
-          const regularPay = totalRegularHours * baseRate;
-          const bonusPay = (totalBonusHours * overtimeRate) + roleBonus;
-          const totalPay = regularPay + bonusPay;
-
-          await Payment.create({
-            employeeId: emp._id,
-            amount: totalPay,
-            period: {
-              startDate,
-              endDate
-            },
-            status: 'completed', // Already paid
+            status: paymentStatus,
             regularHours: totalRegularHours,
             bonusHours: totalBonusHours,
             hourlyRate: baseRate,
             bonusRateMultiplier: company.bonusRateMultiplier,
             timeLogIds: dayLogs.map(log => log._id),
-            arifpayTransactionId: `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            paymentDate: new Date(logDate.getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days after work
-            approvedBy: employer._id,
-            approvedAt: new Date(logDate.getTime() + 24 * 60 * 60 * 1000) // 1 day after work
+            approvedBy,
+            approvedAt,
+            arifpaySessionId,
+            arifpayTransactionId,
+            paymentDate
           });
           
-          console.log(`Created completed payment for ${employeeWithRole.name} on ${dayKey}: $${totalPay.toFixed(2)}`);
+          allPayments.push({ payment, dayLogs, dayKey, employeeName: employeeWithRole.name });
+          
+          console.log(`Created ${paymentStatus} payment for ${employeeWithRole.name} on ${dayKey}: $${totalPay.toFixed(2)}`);
         }
+      }
+    }
+
+    // Mark time logs as 'paid' only for completed payments (following correct workflow)
+    console.log('Marking time logs as paid for completed payments...');
+    for (const { payment, dayLogs } of allPayments) {
+      if (payment.status === 'completed') {
+        await TimeLog.updateMany(
+          { _id: { $in: dayLogs.map(log => log._id) } },
+          { status: 'paid' }
+        );
+        console.log(`Marked ${dayLogs.length} time logs as paid for payment ${payment._id}`);
       }
     }
 
@@ -308,7 +342,8 @@ async function seed() {
       Employee.syncIndexes?.(),
       JobRole.syncIndexes?.(),
       TimeLog.syncIndexes?.(),
-      Payment.syncIndexes?.()
+      Payment.syncIndexes?.(),
+      Subscription.syncIndexes?.()
     ]);
 
     console.log('Seed completed successfully.');
@@ -328,7 +363,13 @@ async function seed() {
     
     console.log('\n=== PAYMENT STATUS BREAKDOWN ===');
     console.log(`Pending: ${await Payment.countDocuments({ status: 'pending' })}`);
+    console.log(`Approved: ${await Payment.countDocuments({ status: 'approved' })}`);
+    console.log(`Processing: ${await Payment.countDocuments({ status: 'processing' })}`);
     console.log(`Completed: ${await Payment.countDocuments({ status: 'completed' })}`);
+    console.log(`Failed: ${await Payment.countDocuments({ status: 'failed' })}`);
+    
+    console.log('\n=== SUBSCRIPTION INFO ===');
+    console.log(`Subscriptions: ${await Subscription.countDocuments()}`);
     
     console.log('\n=== LOGIN CREDENTIALS ===');
     console.log('Employer: employer1@example.com / Password123!');

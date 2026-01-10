@@ -16,6 +16,7 @@ import DashboardLayout from '@/components/DashboardLayout';
 const EmployeesManagement = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -31,8 +32,10 @@ const EmployeesManagement = () => {
   const [telebirrMsisdn, setTelebirrMsisdn] = useState('');
 
   useEffect(() => {
-    fetchEmployees();
-    fetchJobRoles();
+    setPageLoading(true);
+    Promise.all([fetchEmployees(), fetchJobRoles()]).finally(() => {
+      setPageLoading(false);
+    });
   }, []);
 
   const fetchEmployees = async () => {
@@ -41,6 +44,8 @@ const EmployeesManagement = () => {
       setEmployees(response.data.employees || []);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to fetch employees');
+    } finally {
+      setPageLoading(false);
     }
   };
 
@@ -178,6 +183,23 @@ const EmployeesManagement = () => {
       setLoading(false);
     }
   };
+
+  if (pageLoading) {
+    return (
+      <DashboardLayout 
+        title="Employees" 
+        subtitle="Loading..."
+        role="employer"
+      >
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading employees...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout 

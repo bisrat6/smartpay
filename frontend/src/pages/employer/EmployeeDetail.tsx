@@ -36,6 +36,7 @@ const EmployeeDetail = () => {
     onTimePercentage: 0
   });
   const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,8 +44,10 @@ const EmployeeDetail = () => {
 
   useEffect(() => {
     if (id) {
-      fetchEmployeeData();
-      fetchTimeLogs();
+      setPageLoading(true);
+      Promise.all([fetchEmployeeData(), fetchTimeLogs()]).finally(() => {
+        setPageLoading(false);
+      });
     }
   }, [id, statusFilter]);
 
@@ -137,7 +140,7 @@ const EmployeeDetail = () => {
 
   const totalPages = Math.ceil(timeLogs.length / itemsPerPage);
 
-  if (!employee) {
+  if (pageLoading || !employee) {
     return (
       <DashboardLayout title="Employee Details" subtitle="Loading..." role="employer">
         <div className="flex items-center justify-center py-12">

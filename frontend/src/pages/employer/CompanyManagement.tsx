@@ -37,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const CompanyManagement = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [jobRoleDialogOpen, setJobRoleDialogOpen] = useState(false);
   const [editCompanyDialogOpen, setEditCompanyDialogOpen] = useState(false);
@@ -58,8 +59,10 @@ const CompanyManagement = () => {
   const [roleBonus, setRoleBonus] = useState("");
 
   useEffect(() => {
-    fetchCompanyData();
-    fetchJobRoles();
+    setPageLoading(true);
+    Promise.all([fetchCompanyData(), fetchJobRoles()]).finally(() => {
+      setPageLoading(false);
+    });
   }, []);
 
   const fetchCompanyData = async () => {
@@ -202,6 +205,23 @@ const CompanyManagement = () => {
       setEditCompanyDialogOpen(true);
     }
   };
+
+  if (pageLoading) {
+    return (
+      <DashboardLayout 
+        title="Company Settings" 
+        subtitle="Loading..."
+        role="employer"
+      >
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading company data...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout 

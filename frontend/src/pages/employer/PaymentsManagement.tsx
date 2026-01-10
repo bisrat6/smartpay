@@ -33,6 +33,7 @@ const PaymentsManagement = () => {
   const [company, setCompany] = useState<any>(null);
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
   
@@ -68,10 +69,15 @@ const PaymentsManagement = () => {
   }, [statusFilter, employeeFilter]);
 
   useEffect(() => {
-    fetchCompany();
-    fetchEmployees();
-    fetchSummary();
-    fetchPayments();
+    setPageLoading(true);
+    Promise.all([
+      fetchCompany(),
+      fetchEmployees(),
+      fetchSummary(),
+      fetchPayments()
+    ]).finally(() => {
+      setPageLoading(false);
+    });
   }, []);
 
   useEffect(() => {
@@ -316,6 +322,23 @@ const PaymentsManagement = () => {
     }
     return true;
   });
+
+  if (pageLoading) {
+    return (
+      <DashboardLayout 
+        title="Payments" 
+        subtitle="Loading..."
+        role="employer"
+      >
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading payments...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout 

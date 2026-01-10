@@ -1,47 +1,98 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Clock, CheckCircle2, DollarSign, AlertCircle, XCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { timeLogApi, paymentApi } from '@/lib/api';
-import { format } from 'date-fns';
-import DashboardLayout from '@/components/DashboardLayout';
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Clock,
+  CheckCircle2,
+  DollarSign,
+  AlertCircle,
+  XCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+import { timeLogApi, paymentApi } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
+import DashboardLayout from "@/components/DashboardLayout";
 
 const TimeLogsManagement = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('pending');
+  const [pageLoading, setPageLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("pending");
   const [approvedUnpaidLogs, setApprovedUnpaidLogs] = useState<any[]>([]);
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
-    fetchLogs();
-    fetchApprovedUnpaidLogs();
+    const isInitial = isInitialMount.current;
+    if (isInitial) {
+      isInitialMount.current = false;
+      setPageLoading(true);
+    }
+    Promise.all([fetchLogs(), fetchApprovedUnpaidLogs()]).finally(() => {
+      if (isInitial) {
+        setPageLoading(false);
+      }
+    });
   }, [statusFilter]);
 
   const fetchLogs = async () => {
     try {
-      const response = await timeLogApi.getCompanyLogs({ status: statusFilter });
+      const response = await timeLogApi.getCompanyLogs({
+        status: statusFilter,
+      });
       setLogs(response.data.timeLogs || []);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to fetch logs');
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to fetch logs"
+      );
     }
   };
 
   const fetchApprovedUnpaidLogs = async () => {
     try {
       // Get approved time logs
-      const logsResponse = await timeLogApi.getCompanyLogs({ status: 'approved' });
+      const logsResponse = await timeLogApi.getCompanyLogs({
+        status: "approved",
+      });
       const approvedLogs = logsResponse.data.timeLogs || [];
-      console.log('Approved logs:', approvedLogs.length);
-      
+      console.log("Approved logs:", approvedLogs.length);
+
       // Get all payments to check which logs have been paid
       const paymentsResponse = await paymentApi.list();
       const payments = paymentsResponse.data.payments || [];
-      console.log('All payments:', payments.length);
-      console.log('Payment statuses:', payments.map(p => ({ status: p.status, timeLogCount: p.timeLogIds?.length })));
-      
+      console.log("All payments:", payments.length);
+      console.log(
+        "Payment statuses:",
+        payments.map((p) => ({
+          status: p.status,
+          timeLogCount: p.timeLogIds?.length,
+        }))
+      );
+
       // Filter logs that don't have any payments (pending, processing, or completed)
       const unpaidLogs = approvedLogs.filter((log: any) => {
         // Check if this log is part of any payment (regardless of status)
@@ -49,30 +100,34 @@ const TimeLogsManagement = () => {
           // Check if payment includes this time log
           return payment.timeLogIds?.some((id: string) => id === log._id);
         });
-        
+
         if (hasPayment) {
           console.log(`Log ${log._id} has payment, filtering out`);
         }
-        
+
         return !hasPayment; // Show only logs without any payment
       });
-      
-      console.log('Unpaid logs after filtering:', unpaidLogs.length);
+
+      console.log("Unpaid logs after filtering:", unpaidLogs.length);
       setApprovedUnpaidLogs(unpaidLogs);
     } catch (error: any) {
-      console.error('Failed to fetch approved unpaid logs:', error);
+      console.error("Failed to fetch approved unpaid logs:", error);
     }
   };
 
   const handleApprove = async (logId: string) => {
     setLoading(true);
     try {
-      await timeLogApi.approve(logId, { status: 'approved' });
-      toast.success('Time log approved!');
+      await timeLogApi.approve(logId, { status: "approved" });
+      toast.success("Time log approved!");
       fetchLogs();
       fetchApprovedUnpaidLogs();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to approve log');
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to approve log"
+      );
     } finally {
       setLoading(false);
     }
@@ -81,18 +136,25 @@ const TimeLogsManagement = () => {
   const handleReject = async (logId: string) => {
     setLoading(true);
     try {
-      await timeLogApi.approve(logId, { status: 'rejected', notes: 'Rejected by employer' });
-      toast.success('Time log rejected');
+      await timeLogApi.approve(logId, {
+        status: "rejected",
+        notes: "Rejected by employer",
+      });
+      toast.success("Time log rejected");
       fetchLogs();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to reject log');
+      toast.error(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to reject log"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const calculateDuration = (clockIn: string, clockOut?: string) => {
-    if (!clockOut) return 'Active';
+    if (!clockOut) return "Active";
     const start = new Date(clockIn).getTime();
     const end = new Date(clockOut).getTime();
     const hours = ((end - start) / (1000 * 60 * 60)).toFixed(2);
@@ -100,15 +162,32 @@ const TimeLogsManagement = () => {
   };
 
   const stats = {
-    pending: logs.filter(l => l.status === 'pending').length,
-    approved: logs.filter(l => l.status === 'approved').length,
-    paid: logs.filter(l => l.status === 'paid').length,
-    total: logs.length
+    pending: logs.filter((l) => l.status === "pending").length,
+    approved: logs.filter((l) => l.status === "approved").length,
+    paid: logs.filter((l) => l.status === "paid").length,
+    total: logs.length,
   };
 
+  if (pageLoading) {
+    return (
+      <DashboardLayout
+        title="Time Logs Management"
+        subtitle="Loading..."
+        role="employer"
+      >
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading time logs...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
-    <DashboardLayout 
-      title="Time Logs Management" 
+    <DashboardLayout
+      title="Time Logs Management"
       subtitle="Review and approve employee time entries"
       role="employer"
     >
@@ -149,7 +228,9 @@ const TimeLogsManagement = () => {
                 <CheckCircle2 className="w-5 h-5 text-green-700" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-black">{stats.approved}</p>
+                <p className="text-2xl font-bold text-black">
+                  {stats.approved}
+                </p>
                 <p className="text-sm text-gray-500">Approved</p>
               </div>
             </div>
@@ -181,7 +262,9 @@ const TimeLogsManagement = () => {
                   <Clock className="w-5 h-5" />
                   Time Log Approvals
                 </CardTitle>
-                <CardDescription>Review and approve employee time entries</CardDescription>
+                <CardDescription>
+                  Review and approve employee time entries
+                </CardDescription>
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-40">
@@ -196,11 +279,13 @@ const TimeLogsManagement = () => {
               </Select>
             </div>
           </CardHeader>
-            <CardContent>
+          <CardContent>
             {logs.length === 0 ? (
               <div className="text-center py-12">
                 <Clock className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-600">No time logs found for this filter</p>
+                <p className="text-gray-600">
+                  No time logs found for this filter
+                </p>
               </div>
             ) : (
               <Table>
@@ -212,27 +297,47 @@ const TimeLogsManagement = () => {
                     <TableHead>Clock Out</TableHead>
                     <TableHead>Duration</TableHead>
                     <TableHead>Status</TableHead>
-                    {statusFilter === 'pending' && <TableHead>Actions</TableHead>}
+                    {statusFilter === "pending" && (
+                      <TableHead>Actions</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {logs.map((log) => (
                     <TableRow key={log._id}>
-                      <TableCell className="font-medium">{log.employeeId?.name || 'Unknown'}</TableCell>
-                      <TableCell>{format(new Date(log.clockIn), 'MMM dd, yyyy')}</TableCell>
-                      <TableCell>{format(new Date(log.clockIn), 'HH:mm')}</TableCell>
-                      <TableCell>{log.clockOut ? format(new Date(log.clockOut), 'HH:mm') : '-'}</TableCell>
-                      <TableCell className="font-semibold">{calculateDuration(log.clockIn, log.clockOut)}</TableCell>
+                      <TableCell className="font-medium">
+                        {log.employeeId?.name || "Unknown"}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant={
-                          log.status === 'approved' ? 'default' :
-                          log.status === 'pending' ? 'secondary' :
-                          log.status === 'paid' ? 'default' : 'destructive'
-                        }>
+                        {format(new Date(log.clockIn), "MMM dd, yyyy")}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(log.clockIn), "HH:mm")}
+                      </TableCell>
+                      <TableCell>
+                        {log.clockOut
+                          ? format(new Date(log.clockOut), "HH:mm")
+                          : "-"}
+                      </TableCell>
+                      <TableCell className="font-semibold">
+                        {calculateDuration(log.clockIn, log.clockOut)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            log.status === "approved"
+                              ? "default"
+                              : log.status === "pending"
+                              ? "secondary"
+                              : log.status === "paid"
+                              ? "default"
+                              : "destructive"
+                          }
+                        >
                           {log.status}
                         </Badge>
                       </TableCell>
-                      {statusFilter === 'pending' && (
+                      {statusFilter === "pending" && (
                         <TableCell>
                           <div className="flex gap-2">
                             <Button
@@ -274,14 +379,17 @@ const TimeLogsManagement = () => {
                     <AlertCircle className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-lg mb-1">Unpaid Approved Time Logs</h3>
+                    <h3 className="font-bold text-lg mb-1">
+                      Unpaid Approved Time Logs
+                    </h3>
                     <p className="text-sm opacity-90">
-                      {approvedUnpaidLogs.length} time logs are approved but not yet paid. Process payroll to continue.
+                      {approvedUnpaidLogs.length} time logs are approved but not
+                      yet paid. Process payroll to continue.
                     </p>
                   </div>
                 </div>
-                <Button 
-                  onClick={() => navigate('/employer/payments')}
+                <Button
+                  onClick={() => navigate("/employer/payments")}
                   className="bg-white hover:bg-gray-100 text-orange-600"
                 >
                   Process Payroll

@@ -42,11 +42,11 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(0 0% 8%), hsl(0 0% 2%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 98%));
     --gradient-subtle: linear-gradient(135deg, hsl(0 0% 98%), hsl(0 0% 96%));
-    
+
     /* Glassmorphism effects */
     --glass-bg: hsla(0, 0%, 100%, 0.7);
     --glass-border: hsla(0, 0%, 100%, 0.2);
-    
+
     /* Shadows for depth */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
@@ -95,7 +95,7 @@ All colors MUST be HSL.
     --gradient-primary: linear-gradient(135deg, hsl(0 0% 95%), hsl(0 0% 100%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 8%), hsl(0 0% 6%));
     --gradient-subtle: linear-gradient(135deg, hsl(0 0% 8%), hsl(0 0% 10%));
-    
+
     --glass-bg: hsla(0, 0%, 0%, 0.7);
     --glass-border: hsla(0, 0%, 100%, 0.1);
 
@@ -119,7 +119,12 @@ All colors MUST be HSL.
     @apply bg-background text-foreground font-sans antialiased;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 }
@@ -130,16 +135,25 @@ All colors MUST be HSL.
     backdrop-filter: blur(12px);
     border: 1px solid var(--glass-border);
   }
-  
+
   .gradient-primary {
     background: var(--gradient-primary);
   }
-  
+
   .gradient-card {
     background: var(--gradient-card);
   }
-  
+
   .shadow-elegant {
     box-shadow: var(--shadow-lg);
+  }
+
+  /* Utility to hide scrollbars but keep scroll functionality */
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
   }
 }

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { removeToken } from './auth';
 
 const API_BASE_URL = '/api';
 
@@ -19,11 +20,21 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Normalize error messages for better diagnostics
+// Normalize error messages for better diagnostics and handle 401 errors
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error?.response?.data?.message) {
+    if (error?.response?.status === 401) {
+      // Token expired or invalid - clear token and redirect to login
+      removeToken();
+      
+      // Only redirect if we're not already on the login page
+      if (window.location.pathname !== '/auth/login' && window.location.pathname !== '/auth/register') {
+        window.location.href = '/auth/login';
+      }
+      
+      error.message = error?.response?.data?.message || 'Session expired. Please login again.';
+    } else if (error?.response?.data?.message) {
       error.message = error.response.data.message;
     } else if (error?.message === 'Network Error') {
       error.message = 'Network error: cannot reach server';

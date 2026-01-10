@@ -23,14 +23,18 @@ import DashboardLayout from '@/components/DashboardLayout';
 
 const PaymentDetails = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [payment, setPayment] = useState<any>(null);
   const [company, setCompany] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     if (id) {
-      fetchPaymentDetails();
-      fetchCompany();
+      setPageLoading(true);
+      Promise.all([fetchPaymentDetails(), fetchCompany()]).finally(() => {
+        setPageLoading(false);
+      });
     }
   }, [id]);
 
@@ -129,12 +133,12 @@ const PaymentDetails = () => {
     );
   };
 
-  if (!payment) {
+  if (pageLoading || !payment) {
     return (
       <DashboardLayout title="Payment Details" subtitle="Loading..." role="employer">
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <RefreshCw className="w-16 h-16 mx-auto animate-spin text-gray-300 mb-4" />
+            <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600">Loading payment details...</p>
           </div>
         </div>

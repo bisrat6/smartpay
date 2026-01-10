@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,12 +27,23 @@ const PayrollSummary = () => {
   const [employees, setEmployees] = useState<any[]>([]);
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [dateRange, setDateRange] = useState('month');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
-    fetchData();
+    const isInitial = isInitialMount.current;
+    if (isInitial) {
+      isInitialMount.current = false;
+      setPageLoading(true);
+    }
+    fetchData().finally(() => {
+      if (isInitial) {
+        setPageLoading(false);
+      }
+    });
   }, [dateRange, customStartDate, customEndDate]);
 
   const fetchData = async () => {
@@ -211,6 +222,23 @@ const PayrollSummary = () => {
       console.error('Failed to fetch recent activities:', error);
     }
   };
+
+  if (pageLoading) {
+    return (
+      <DashboardLayout 
+        title="Payroll Summary" 
+        subtitle="Loading..."
+        role="employer"
+      >
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="w-16 h-16 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading payroll summary...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout 
