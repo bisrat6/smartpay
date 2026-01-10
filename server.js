@@ -1,3 +1,4 @@
+//server (entry point)
 const app = require("./app");
 const connectDB = require("./config/db");
 const { initializeSchedulers } = require("./services/scheduler");
